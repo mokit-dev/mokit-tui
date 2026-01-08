@@ -1,6 +1,6 @@
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
-from textual.widgets import Header, Footer, Button, Static, Input, Label
+from textual.widgets import Header, Footer, Button, Static, Input, Label, Select
 from textual import on
 from textual.events import Click
 import subprocess, sys
@@ -10,120 +10,15 @@ from parser import GJFParser
 from gen import GJFGenerator
 from widgets import InputPreview, TemplateInfo, MethodSelect
 from screens import FileLoadScreen, OutputScreen
+from css import CSS
+
+from workflow import *
 
 
 class MTUI(App):
     """TUI for Gaussian input generation"""
 
-    CSS = """
-    Screen {
-        align: center middle;
-    }
-    
-    #main-container {
-        width: 95%;
-        height: 95%;
-        border: solid $primary;
-        padding: 1;
-    }
-    
-    #preview-box {
-        height: 30%;
-        border: solid $primary;
-        margin: 1;
-        padding: 1;
-        background: $surface;
-        overflow-y: auto;
-    }
-    
-    #controls-container {  /* CHANGED: New container for collapsible */
-        height: 40%;
-        margin: 0;
-        padding: 0;  /* Remove padding from container */
-    }
-    
-    #controls-header {  /* NEW: Header for collapsible */
-        height: 3;
-        padding: 1;
-        margin: 0;
-    }
-    
-    #controls {  /* CHANGED: Now inside collapsible */
-        padding: 1;
-        height: 100%;
-    }
-    
-    #buttons {
-        dock: bottom;
-        height: 10%;
-        margin: 0;
-        padding: 1;
-        align: left bottom;
-    }
-    
-    Button {
-        margin: 0;
-        color: $text;
-        background: $surface;
-        border: none;
-    }
-    .shortcut-hint {
-        text-style: italic;
-        color: $text-muted;
-        margin-left: 1;
-    }
-    
-    #method-select {
-        width: 50;
-        margin-right: 2;
-    }
-    
-    Select, Input {
-        margin-right: 2;
-    }
-    
-    
-    .label {
-        width: 12;
-    }
-    
-    #file-dialog, #output-dialog {
-        width: 60%;
-        height: 30%;
-        border: thick $primary;
-        background: $surface;
-    }
-    
-    .dialog-title {
-        text-align: center;
-        padding: 1;
-        text-style: bold;
-    }
-    .settings-title {
-        margin-bottom: 0;
-    }
-    
-    .option-group {
-        margin: 0;
-        padding: 0;
-        border: none;
-        height: auto;
-    }
-    
-    .option-row {
-        height: auto;
-        margin: 0;
-        align: left middle;
-    }
-    
-    #keywords-input {
-            width: 50;
-        }
-
-    .collapsible-title {
-            padding-left: 1;
-        }
-    """
+    CSS = CSS
 
     def __init__(self):
         super().__init__()
@@ -134,6 +29,8 @@ class MTUI(App):
         self.parser = GJFParser()
         self.generator = GJFGenerator()
         self.settings_visible = True
+        self.next_step_fch = "default.fch"
+        self.next_step_visible = True  # NEW: Track next-step container visibility
 
         self.options = {
             "method": "b3lyp",
@@ -158,7 +55,9 @@ class MTUI(App):
             with Container(id="controls-container"):
                 with Horizontal(id="controls-header"):
                     yield Static(
-                        "🔧 [b]Calculation Settings[/b]", classes="collapsible-title",id="controls-title"
+                        "🔧 [b]Calculation Settings[/b]",
+                        classes="collapsible-title",
+                        id="controls-title",
                     )
                     # yield Button("⬆️ Hide", id="toggle-settings-btn", variant="default")
 
@@ -167,18 +66,18 @@ class MTUI(App):
                         with Horizontal(classes="option-row"):
                             yield Label("Method: ", classes="label")
                             from widgets import MethodSelect
-    
+
                             method_select = MethodSelect(self.generator)
                             method_select.id = "method-select"
                             yield method_select
-    
+
                             yield Label("Basis Set: ", classes="label")
                             yield Input(
                                 value="6-31g(d)",
                                 placeholder="e.g., 6-31g(d), cc-pvdz",
                                 id="basis-input",
                             )
-    
+
                             # with Container(classes="option-group"):
                             #     with Horizontal(classes="option-row"):
                             # yield Label("Memory: ", classes="label")
@@ -187,24 +86,24 @@ class MTUI(App):
                             #     placeholder="e.g., 2GB",
                             #     id="memory-input"
                             # )
-    
+
                             yield Label("NProc: ", classes="label")
                             yield Input(value="4", placeholder="CPUs", id="proc-input")
-    
+
                             # yield Label("Charge: ", classes="label")
                             # yield Input(
                             #     value="0",
                             #     placeholder="Charge",
                             #     id="charge-input"
                             # )
-    
+
                             # yield Label("Mult: ", classes="label")
                             # yield Input(
                             #     value="1",
                             #     placeholder="Multiplicity",
                             #     id="mult-input"
                             # )
-    
+
                     with Container(classes="option-group"):
                         with Horizontal(classes="option-row"):
                             yield Label("Extra Keywords: ", classes="label")
@@ -218,6 +117,25 @@ class MTUI(App):
                                 id="mokit-options-input",
                             )
 
+            with Container(id="next-step-container"):
+                with Horizontal(id="next-step-header"):
+                    yield Button(
+                        "📝 [b]Prepare Next Step[/b] ▼",
+                        id="next-step-title",
+                        variant="default",
+                    )
+
+                with Container(id="next-step-content"):
+                    with Horizontal(id="fch-select-container"):
+                        yield Label("FCH File:", classes="label")
+                        yield Select(
+                            [],  # Will be populated dynamically
+                            id="fch-select",
+                            prompt="Select .fch file",
+                            classes="fch-select",
+                        )
+                        yield Button("Prepare", id="prepare-btn", variant="primary")
+
             with Horizontal(id="buttons"):
                 # yield Button("📂 Load", variant="primary", id="load-btn")
                 yield Button("▶️ Run", variant="default", id="run-btn")
@@ -228,6 +146,17 @@ class MTUI(App):
     def on_mount(self) -> None:
         """Initialize application"""
         self.load_template(self.template_file)
+
+        # Populate FCH files dropdown
+        self.populate_fch_files()
+
+        # Ensure next-step container is visible
+        # Don't call toggle_next_step() here as it toggles visibility
+        # Just set initial state directly:
+        content = self.query_one("#next-step-content", Container)
+        content.display = True
+        title_btn = self.query_one("#next-step-title", Button)
+        title_btn.label = "📝 [b]Prepare Next Step[/b] ▼"
 
     def update_template_info(self, message: str) -> None:
         """Update template information display"""
@@ -268,7 +197,9 @@ class MTUI(App):
             # self.notify(f"Template loaded. Title set to 'mokit{{}}'", severity="success")
 
         except Exception as e:
-            self.notify(f"Error loading template: {str(e)}", severity="error")
+            self.notify_persistent(
+                f"Error loading template: {str(e)}", severity="error"
+            )
 
     def generate_input(self) -> str:
         """Generate Gaussian input"""
@@ -305,7 +236,7 @@ class MTUI(App):
             f.write(content)
 
         file_size = Path(self.input_file).stat().st_size
-        self.notify(
+        self.notify_persistent(
             f"Saved to {self.input_file} ({file_size} bytes)", severity="information"
         )
 
@@ -331,7 +262,7 @@ class MTUI(App):
                 )
             )
         except FileNotFoundError:
-            self.notify("Backend 'xxx' not found!", severity="error")
+            self.notify_persistent("Backend 'xxx' not found!", severity="error")
 
     def show_geometry(self) -> None:
         """Show molecular geometry"""
@@ -347,7 +278,33 @@ class MTUI(App):
                 OutputScreen(f"{info}:\n\n{geom}", title="Molecular Geometry")
             )
         else:
-            self.notify("No geometry loaded", severity="warning")
+            self.notify_persistent("No geometry loaded", severity="warning")
+
+    def toggle_next_step(self) -> None:
+        """Toggle visibility of next-step container"""
+        self.next_step_visible = not self.next_step_visible
+        content = self.query_one("#next-step-content", Container)
+        title_btn = self.query_one("#next-step-title", Button)
+
+        if self.next_step_visible:
+            content.display = True
+            title_btn.label = "📝 [b]Prepare Next Step[/b] ▼"
+            # Ensure container has proper height
+            next_step_container = self.query_one("#next-step-container", Container)
+            next_step_container.styles.height = "auto"
+        else:
+            content.display = False
+            title_btn.label = "📝 [b]Prepare Next Step[/b] ▶"
+            # Collapse container height
+            next_step_container = self.query_one("#next-step-container", Container)
+            next_step_container.styles.height = "3"
+
+    prepare_next_step = prepare_next_step
+    populate_fch_files = populate_fch_files
+
+    def notify_persistent(self, message: str, severity: str = "information") -> None:
+        """Show a notification that stays until dismissed"""
+        self.notify(message, severity=severity, timeout=0)
 
     @on(Button.Pressed, "#load-btn")
     async def on_load_button(self):
@@ -374,17 +331,26 @@ class MTUI(App):
     @on(Click, "#controls-title")
     def on_settings_title_click(self):
         self.toggle_settings_visibility()
-        
+
     def key_s(self) -> None:
         """s to save"""
         self.save_input_file()
-    
+
     def key_escape(self) -> None:
         """esc to exit"""
         self.exit()
+
     def key_q(self) -> None:
         """esc to exit"""
         self.exit()
+
+    @on(Button.Pressed, "#next-step-title")
+    def on_next_step_title_click(self):
+        self.toggle_next_step()
+
+    @on(Button.Pressed, "#prepare-btn")
+    def on_prepare_button(self):
+        self.prepare_next_step()
 
     @on(Input.Changed)
     def on_input_change(self, event):
@@ -442,19 +408,6 @@ class MTUI(App):
 
 def main():
     """Main entry point"""
-    # Create sample template if needed
-    sample_template = """%mem=2GB
-%nprocshared=4
-# B3LYP/6-31G(d) opt
-
-Water molecule
-
-0 1
-O   0.000000   0.000000   0.119262
-H   0.000000   0.763239  -0.477047
-H   0.000000  -0.763239  -0.477047
-
-"""
 
     template_file = sys.argv[1]
     # if not Path(template_file).exists():
