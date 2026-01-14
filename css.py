@@ -16,6 +16,7 @@ CSS = """
         padding: 1;
         margin: 1 0;
         overflow-y: auto;
+        background: $surface;
     }
     
     #buttons {
@@ -26,15 +27,15 @@ CSS = """
         align: center middle;
     }
     
-    Button {
+    /*Button {
         margin: 1;
         padding: 1 2;
         width: 12;
         height: 3;
         text-align: center;
-    }
+    }*/
 
-    Button:hover {
+    /*Button:hover {
         background: $primary;
         color: $surface;
         text-style: underline;
@@ -49,8 +50,7 @@ CSS = """
         background: $primary;
         color: $surface;
         text-style: bold;
-    }
-    
+    }*/
     
     Select, Input {
         margin: 0 1;
@@ -69,7 +69,6 @@ CSS = """
         width: 10;
         margin-right: 1;
         text-align: right;
-        color: $text-muted;
     }
     
     .option-row {
