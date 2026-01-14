@@ -6,7 +6,7 @@ CSS = """
     
     #main-container {
         width: 90%;
-        height: 85%;
+        height: 75%;
         padding: 2;
         margin: 1;
     }
@@ -20,7 +20,7 @@ CSS = """
     
     #buttons {
         dock: bottom;
-        height: 10%;
+        height: 20%;
         padding: 1;
         margin: 0;
         align: center middle;
@@ -29,28 +29,28 @@ CSS = """
     Button {
         margin: 1;
         padding: 1 2;
-        min-width: 8;
+        width: 12;
         height: 3;
         text-align: center;
-        color: $text;
     }
-    
+
     Button:hover {
         background: $primary;
         color: $surface;
         text-style: underline;
     }
-    
+
     Button:focus {
         background: $primary;
         color: $surface;
     }
-    
+
     Button.-primary {
         background: $primary;
         color: $surface;
         text-style: bold;
     }
+    
     
     Select, Input {
         margin: 0 1;

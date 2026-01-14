@@ -67,7 +67,8 @@ class MTUI(App):
             yield TemplateInfo(id="template-info")
             yield InputPreview(id="preview-box")
 
-            with Horizontal(id="buttons"):
+        with Container(id="buttons"):
+            with Horizontal():
                 yield Button("Settings", variant="default", id="settings-btn")
                 yield Button("Next Step", variant="default", id="next-step-btn")
                 yield Button("Run", variant="default", id="run-btn")
