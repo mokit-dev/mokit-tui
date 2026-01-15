@@ -22,6 +22,36 @@ class TemplateInfo(Static):
         self.update(f"[b]Template Info:[/b] {info}")
 
 
+class OutputPreview(Static):
+    """Widget to display output file preview information"""
+
+    content = reactive("")
+    output_file = reactive("")
+    has_output = reactive(False)
+
+    def watch_content(self, content: str) -> None:
+        """Update display when content changes"""
+        title = "[b]Output Preview:[/b]"
+        if self.output_file:
+            title += f" [dim]({self.output_file})[/dim]"
+        if self.has_output:
+            title += " [green]●[/green]"
+        
+        self.update(f"{title}\n\n{content}")
+    
+    def set_output_file(self, filepath: str):
+        """Set the output file path"""
+        self.output_file = filepath
+        if not self.content:
+            self.content = "[dim]Loading output file...[/dim]"
+    
+    def set_no_output(self):
+        """Set to show no output available"""
+        self.has_output = False
+        self.output_file = ""
+        self.content = "[dim]No output file found[/dim]"
+
+
 class MethodSelect(Select):
     """Method selection widget"""
 

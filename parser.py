@@ -159,3 +159,134 @@ class GJFParser:
             if len(parts) >= 1 and parts[0].isalpha():
                 atoms.append(parts[0])
         return len(atoms), list(set(atoms))
+
+
+class OutputParser:
+    """Parse Gaussian/MOKIT output files to extract key information"""
+    
+    def __init__(self):
+        self.warnings = []
+        self.programs = []
+        self.energies = []
+        
+    def parse_output_file(self, filepath: str) -> Dict:
+        """Parse an output file and extract key information"""
+        self.warnings = []
+        self.programs = []
+        self.energies = []
+        
+        try:
+            with open(filepath, "r") as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            return {
+                "warnings": [],
+                "programs": [],
+                "energies": [],
+                "has_output": False
+            }
+        
+        for line_num, line in enumerate(lines, 1):
+            line = line.strip()
+            
+            # Parse warnings
+            if self._is_warning_line(line):
+                self.warnings.append({
+                    "line": line,
+                    "line_number": line_num
+                })
+            
+            # Parse program usage
+            elif self._is_program_line(line):
+                self.programs.append({
+                    "line": line,
+                    "line_number": line_num
+                })
+            
+            # Parse energies
+            elif self._is_energy_line(line):
+                self.energies.append({
+                    "line": line,
+                    "line_number": line_num
+                })
+        
+        return {
+            "warnings": self.warnings,
+            "programs": self.programs,
+            "energies": self.energies,
+            "has_output": bool(self.warnings or self.programs or self.energies)
+        }
+    
+    def _is_warning_line(self, line: str) -> bool:
+        """Check if line contains a warning"""
+        warning_patterns = [
+            r"Warning:",
+            r"WARNING:",
+            r"UserWarning:",
+            r"^.*[Ww]arning.*$",
+        ]
+        
+        for pattern in warning_patterns:
+            if re.search(pattern, line):
+                return True
+        return False
+    
+    def _is_program_line(self, line: str) -> bool:
+        """Check if line contains program usage information"""
+        program_patterns = [
+            r"using program\s+\w+",
+            r"HF using program\s+\w+",
+            r"CASSCF\([^)]+\)\s+using program\s+\w+",
+            r"CASCI\([^)]+\)\s+using program\s+\w+",
+            r"MC-PDFT\([^)]+\)\s+using program\s+\w+",
+        ]
+        
+        for pattern in program_patterns:
+            if re.search(pattern, line):
+                return True
+        return False
+    
+    def _is_energy_line(self, line: str) -> bool:
+        """Check if line contains energy information"""
+        energy_patterns = [
+            r"E\([^)]+\)\s*=\s*[-+]?\d*\.\d+.*a\.u\.",
+            r"E\(\w+\)\s*=\s*[-+]?\d*\.\d+",
+            r"SCF Done:\s+E\([^)]+\)\s*=\s*[-+]?\d*\.\d+",
+            r"CASCI E\s*=\s*[-+]?\d*\.\d+",
+            r"E\(\w+\)\s*=\s*[-+]?\d*\.\d+\s*a\.u\.",
+        ]
+        
+        for pattern in energy_patterns:
+            if re.search(pattern, line):
+                return True
+        return False
+    
+    def format_preview(self, parsed_data: Dict) -> str:
+        """Format parsed data for display in preview widget"""
+        if not parsed_data.get("has_output", False):
+            return "[dim]No output file found or no key information detected[/dim]"
+        
+        sections = []
+        
+        # Format warnings
+        if parsed_data["warnings"]:
+            sections.append("[bold yellow]Warnings:[/bold yellow]")
+            for warning in parsed_data["warnings"]:
+                sections.append(f"[yellow]Line {warning['line_number']}: {warning['line']}[/yellow]")
+            sections.append("")
+        
+        # Format programs
+        if parsed_data["programs"]:
+            sections.append("[bold blue]Programs Used:[/bold blue]")
+            for program in parsed_data["programs"]:
+                sections.append(f"[blue]Line {program['line_number']}: {program['line']}[/blue]")
+            sections.append("")
+        
+        # Format energies
+        if parsed_data["energies"]:
+            sections.append("[bold green]Energies:[/bold green]")
+            for energy in parsed_data["energies"]:
+                sections.append(f"[green]Line {energy['line_number']}: {energy['line']}[/green]")
+            sections.append("")
+        
+        return "\n".join(sections)

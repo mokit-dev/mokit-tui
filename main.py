@@ -6,9 +6,9 @@ from textual.events import Click
 import subprocess, sys, argparse
 from pathlib import Path
 
-from parser import GJFParser
+from parser import GJFParser, OutputParser
 from gen import GJFGenerator
-from widgets import InputPreview, TemplateInfo, MethodSelect
+from widgets import InputPreview, TemplateInfo, OutputPreview, MethodSelect
 from screens import FileLoadScreen, OutputScreen, SettingsScreen, NextStepScreen
 from css import CSS
 
@@ -42,6 +42,7 @@ class MTUI(App):
         self.template_sections = {}
         self.template_path = None
         self.parser = GJFParser()
+        self.output_parser = OutputParser()
         self.generator = GJFGenerator()
         self.next_step_fch = "default.fch"
         self.auto_settings = cli_args.auto_settings if cli_args else False
@@ -65,10 +66,11 @@ class MTUI(App):
 
         with Container(id="main-container"):
             yield TemplateInfo(id="template-info")
-            yield InputPreview(id="preview-box")
-
-        with Container(id="buttons"):
-            with Horizontal():
+            with Container(id="preview-container"):
+                yield InputPreview(id="preview-box")
+                yield OutputPreview(id="output-preview")
+            
+            with Horizontal(id="buttons"):
                 yield Button("Settings", variant="default", id="settings-btn")
                 yield Button("Next Step", variant="default", id="next-step-btn")
                 yield Button("Run", variant="default", id="run-btn")
@@ -118,6 +120,7 @@ class MTUI(App):
 
             self.update_template_info(info)
             self.update_preview()
+            self.load_output_if_exists(filepath)
 
             # self.notify(f"Template loaded. Title set to 'mokit{{}}'", severity="success")
 
@@ -263,6 +266,56 @@ class MTUI(App):
             self.call_after_refresh(self.auto_open_next_step)
     
     populate_fch_files = populate_fch_files
+
+    def load_output_if_exists(self, gjf_path: str) -> None:
+        """Load corresponding .out file if it exists"""
+        try:
+            # Try different possible output file names
+            base_path = Path(gjf_path)
+            possible_outputs = [
+                str(base_path) + ".out",  # file.gjf.out
+                base_path.with_suffix('.out'),  # file.out
+                str(base_path).replace('.gjf', '.out'),  # file.out
+            ]
+            
+            output_file = None
+            for candidate in possible_outputs:
+                if Path(candidate).exists():
+                    output_file = candidate
+                    break
+            
+            if output_file:
+                parsed_data = self.output_parser.parse_output_file(output_file)
+                formatted_output = self.output_parser.format_preview(parsed_data)
+                
+                output_preview = self.query_one("#output-preview", OutputPreview)
+                output_preview.set_output_file(Path(output_file).name)
+                output_preview.has_output = parsed_data.get("has_output", False)
+                output_preview.content = formatted_output
+                
+                # Show notification about successful loading
+                if parsed_data.get("has_output", False):
+                    self.notify_persistent(f"Loaded output: {Path(output_file).name}", "information")
+                else:
+                    self.notify_persistent(f"Output file found but no key information: {Path(output_file).name}", "warning")
+            else:
+                # No output file found
+                output_preview = self.query_one("#output-preview", OutputPreview)
+                output_preview.set_no_output()
+                
+        except Exception as e:
+            self.notify_persistent(f"Error loading output file: {str(e)}", "error")
+            # Set no output state on error
+            try:
+                output_preview = self.query_one("#output-preview", OutputPreview)
+                output_preview.set_no_output()
+            except:
+                pass
+
+    def update_output_preview(self) -> None:
+        """Update output preview box"""
+        if self.template_path:
+            self.load_output_if_exists(self.template_path)
 
     def notify_persistent(self, message: str, severity: str = "information") -> None:
         """Show a notification that stays until dismissed"""

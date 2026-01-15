@@ -6,25 +6,44 @@ CSS = """
     
     #main-container {
         width: 90%;
-        height: 75%;
+        height: 90%;
         padding: 2;
         margin: 1;
     }
     
-    #preview-box {
-        height: 40%;
-        padding: 1;
+    #preview-container {
+        height: 75%;
+        layout: horizontal;
         margin: 1 0;
+    }
+    
+    #preview-box, #output-preview {
+        height: 100%;
+        width: 1fr;
+        padding: 1;
         overflow-y: auto;
         background: $surface;
     }
     
+    #preview-box {
+        border-right: solid $primary;
+    }
+    
+    #output-preview {
+        border-left: solid $primary;
+    }
+    
     #buttons {
-        dock: bottom;
-        height: 20%;
+        height: auto;
         padding: 1;
-        margin: 0;
+        margin: 1 0 0 0;
         align: center middle;
+    }
+    
+    #buttons Button {
+        margin: 0 1;
+        min-width: 12;
+        text-align: center;
     }
     
     /*Button {

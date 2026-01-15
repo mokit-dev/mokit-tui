@@ -1,3 +1,4 @@
 **/__pycache__/
 *.gjf
-*.json
+*.jsoin
+/testcase/
