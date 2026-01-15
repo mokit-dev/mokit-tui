@@ -319,7 +319,7 @@ class MTUI(App):
 
     def notify_persistent(self, message: str, severity: str = "information") -> None:
         """Show a notification that stays until dismissed"""
-        self.notify(message, severity=severity, timeout=0)
+        self.notify(message, severity=severity, timeout=0)  # type: ignore
 
     @on(Button.Pressed, "#settings-btn")
     def on_settings_button(self):
