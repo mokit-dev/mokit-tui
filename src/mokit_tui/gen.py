@@ -1,6 +1,6 @@
 import re
 from typing import Dict
-from parser import GJFParser
+from .parser import GJFParser
 
 
 class GJFGenerator:

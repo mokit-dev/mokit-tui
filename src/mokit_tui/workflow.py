@@ -1,6 +1,7 @@
 from textual.widgets import Select
-from widgets import *
+from .widgets import *
 from pathlib import Path
+
 
 # Update prepare_next_step() method to use selected FCH file:
 def prepare_next_step(self) -> None:

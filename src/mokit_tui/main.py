@@ -1,28 +1,39 @@
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
-from textual.widgets import Header, Footer, Button, Static, Input, Label, Select
+from textual.widgets import Header, Footer, Button
 from textual import on
-from textual.events import Click
-import subprocess, sys, argparse
+import subprocess
+import sys
+import argparse
 from pathlib import Path
 
-from parser import GJFParser, OutputParser
-from gen import GJFGenerator
-from widgets import InputPreview, TemplateInfo, OutputPreview, MethodSelect
-from screens import FileLoadScreen, OutputScreen, SettingsScreen, NextStepScreen
-from css import CSS
+from .parser import GJFParser, OutputParser
+from .gen import GJFGenerator
+from .widgets import InputPreview, TemplateInfo, OutputPreview
+from .screens import OutputScreen, SettingsScreen, NextStepScreen
+from .css import CSS
 
-from workflow import *
+from .workflow import *
 
 
 def parse_cli_args(args=None):
     """Parse command-line arguments for debugging options"""
-    parser = argparse.ArgumentParser(description='MOKIT TUI for Gaussian input generation')
-    parser.add_argument('template_file', help='Template GJF file to load')
-    parser.add_argument('-s', '--auto-settings', action='store_true', 
-                       help='Auto-open settings modal on startup')
-    parser.add_argument('-n', '--auto-next-step', action='store_true', 
-                       help='Auto-open next step modal on startup')
+    parser = argparse.ArgumentParser(
+        description="MOKIT TUI for Gaussian input generation"
+    )
+    parser.add_argument("template_file", help="Template GJF file to load")
+    parser.add_argument(
+        "-s",
+        "--auto-settings",
+        action="store_true",
+        help="Auto-open settings modal on startup",
+    )
+    parser.add_argument(
+        "-n",
+        "--auto-next-step",
+        action="store_true",
+        help="Auto-open next step modal on startup",
+    )
     if args is None:
         return parser.parse_args()
     else:
@@ -58,6 +69,7 @@ class MTUI(App):
             "multiplicity": 1,
             "additional_keywords": "",
             "additional_mokit_options": "",
+            "blocked_warnings": ["gvb_sort_pairs"],
         }
 
     def compose(self) -> ComposeResult:
@@ -69,7 +81,7 @@ class MTUI(App):
             with Container(id="preview-container"):
                 yield InputPreview(id="preview-box")
                 yield OutputPreview(id="output-preview")
-            
+
             with Horizontal(id="buttons"):
                 yield Button("Settings", variant="default", id="settings-btn")
                 yield Button("Next Step", variant="default", id="next-step-btn")
@@ -81,7 +93,7 @@ class MTUI(App):
         """Initialize application"""
         if self.template_file:
             self.load_template(self.template_file)
-        
+
         # Set up automated debugging actions if CLI flags are set
         self.setup_auto_actions()
 
@@ -208,53 +220,55 @@ class MTUI(App):
         else:
             self.notify_persistent("No geometry loaded", severity="warning")
 
-    
-
     def prepare_next_step_with_fch(self, fch_file):
         """Prepare next step with specific FCH file"""
         if fch_file:
             self.next_step_fch = fch_file
-            self.notify_persistent(f"Prepared next step with {fch_file}", severity="success")
+            self.notify_persistent(
+                f"Prepared next step with {fch_file}", severity="success"
+            )
         else:
             self.notify_persistent("No FCH file selected", severity="warning")
-    
+
     def auto_open_settings(self) -> None:
         """Programmatically open settings modal for debugging"""
         self.call_after_refresh(self._do_auto_open_settings)
-    
+
     def _do_auto_open_settings(self) -> None:
         """Internal method to open settings modal with delay"""
         settings_screen = SettingsScreen(self.options)
-        
+
         async def handle_settings_result(result):
             if result:
                 self.options.update(result)
                 self.update_preview()
                 self.notify_persistent("Auto-settings applied", severity="information")
-                
+
                 # If next step flag is also set, open it after settings
                 if self.auto_next_step:
                     self.call_after_refresh(self.auto_open_next_step)
-        
+
         self.push_screen(settings_screen, handle_settings_result)
         self.notify_persistent("Auto-opening settings modal...", severity="information")
-    
+
     def auto_open_next_step(self) -> None:
         """Programmatically open next step modal for debugging"""
         self.call_after_refresh(self._do_auto_open_next_step)
-    
+
     def _do_auto_open_next_step(self) -> None:
         """Internal method to open next step modal with delay"""
         next_step_screen = NextStepScreen()
-        
+
         async def handle_next_step_result(result):
             if result and result.get("prepare"):
                 self.prepare_next_step_with_fch(result.get("fch_file"))
             self.notify_persistent("Auto-next-step completed", severity="information")
-        
+
         self.push_screen(next_step_screen, handle_next_step_result)
-        self.notify_persistent("Auto-opening next step modal...", severity="information")
-    
+        self.notify_persistent(
+            "Auto-opening next step modal...", severity="information"
+        )
+
     def setup_auto_actions(self) -> None:
         """Set up automated actions based on CLI flags"""
         if self.auto_settings and self.auto_next_step:
@@ -264,7 +278,7 @@ class MTUI(App):
             self.call_after_refresh(self.auto_open_settings)
         elif self.auto_next_step:
             self.call_after_refresh(self.auto_open_next_step)
-    
+
     populate_fch_files = populate_fch_files
 
     def load_output_if_exists(self, gjf_path: str) -> None:
@@ -274,35 +288,42 @@ class MTUI(App):
             base_path = Path(gjf_path)
             possible_outputs = [
                 str(base_path) + ".out",  # file.gjf.out
-                base_path.with_suffix('.out'),  # file.out
-                str(base_path).replace('.gjf', '.out'),  # file.out
+                base_path.with_suffix(".out"),  # file.out
+                str(base_path).replace(".gjf", ".out"),  # file.out
             ]
-            
+
             output_file = None
             for candidate in possible_outputs:
                 if Path(candidate).exists():
                     output_file = candidate
                     break
-            
+
             if output_file:
                 parsed_data = self.output_parser.parse_output_file(output_file)
-                formatted_output = self.output_parser.format_preview(parsed_data)
-                
+                formatted_output = self.output_parser.format_preview(
+                    parsed_data, self.options.get("blocked_warnings", [])
+                )
+
                 output_preview = self.query_one("#output-preview", OutputPreview)
                 output_preview.set_output_file(Path(output_file).name)
                 output_preview.has_output = parsed_data.get("has_output", False)
                 output_preview.content = formatted_output
-                
+
                 # Show notification about successful loading
                 if parsed_data.get("has_output", False):
-                    self.notify_persistent(f"Loaded output: {Path(output_file).name}", "information")
+                    self.notify_persistent(
+                        f"Loaded output: {Path(output_file).name}", "information"
+                    )
                 else:
-                    self.notify_persistent(f"Output file found but no key information: {Path(output_file).name}", "warning")
+                    self.notify_persistent(
+                        f"Output file found but no key information: {Path(output_file).name}",
+                        "warning",
+                    )
             else:
                 # No output file found
                 output_preview = self.query_one("#output-preview", OutputPreview)
                 output_preview.set_no_output()
-                
+
         except Exception as e:
             self.notify_persistent(f"Error loading output file: {str(e)}", "error")
             # Set no output state on error
@@ -324,22 +345,22 @@ class MTUI(App):
     @on(Button.Pressed, "#settings-btn")
     def on_settings_button(self):
         settings_screen = SettingsScreen(self.options)
-        
+
         async def handle_settings_result(result):
             if result:
                 self.options.update(result)
                 self.update_preview()
-        
+
         self.push_screen(settings_screen, handle_settings_result)
 
     @on(Button.Pressed, "#next-step-btn")
     def on_next_step_button(self):
         next_step_screen = NextStepScreen()
-        
+
         async def handle_next_step_result(result):
             if result and result.get("prepare"):
                 self.prepare_next_step_with_fch(result.get("fch_file"))
-        
+
         self.push_screen(next_step_screen, handle_next_step_result)
 
     @on(Button.Pressed, "#run-btn")
@@ -370,25 +391,19 @@ class MTUI(App):
         """esc to exit"""
         self.exit()
 
-    
-
-    
-
-    
-
 
 def main():
     """Main entry point"""
-    
+
     # Parse CLI arguments
     cli_args = parse_cli_args()
     template_file = cli_args.template_file
-    
+
     # Validate template file exists
     if not Path(template_file).exists():
         print(f"Error: Template file '{template_file}' not found!")
         sys.exit(1)
-    
+
     # Print debug info if auto-flags are set
     if cli_args.auto_settings or cli_args.auto_next_step:
         print("MOKIT TUI - Debug Mode")

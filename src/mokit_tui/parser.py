@@ -1,7 +1,5 @@
 import re
-from pathlib import Path
 from typing import Dict, List, Tuple, Optional
-import json
 
 
 class GJFParser:
@@ -163,67 +161,79 @@ class GJFParser:
 
 class OutputParser:
     """Parse Gaussian/MOKIT output files to extract key information"""
-    
+
     def __init__(self):
         self.warnings = []
         self.programs = []
         self.energies = []
-        
+
     def parse_output_file(self, filepath: str) -> Dict:
         """Parse an output file and extract key information"""
         self.warnings = []
         self.programs = []
         self.energies = []
-        
+
         try:
             with open(filepath, "r") as f:
                 lines = f.readlines()
         except FileNotFoundError:
-            return {
-                "warnings": [],
-                "programs": [],
-                "energies": [],
-                "has_output": False
-            }
-        
-        for line_num, line in enumerate(lines, 1):
-            line = line.strip()
-            
-            # Parse warnings
+            return {"warnings": [], "programs": [], "energies": [], "has_output": False}
+
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            line_num = i + 1
+
+            # Parse warnings (multi-line)
             if self._is_warning_line(line):
+                # Start accumulating warning lines
+                warning_lines = [line]
+                start_line_num = line_num
+                end_line_num = line_num
+                
+                # If the warning line itself is complete, don't accumulate more
+                if not self._is_sentence_complete(line):
+                    # Continue reading lines until sentence is complete
+                    i += 1
+                    while i < len(lines):
+                        next_line = lines[i].strip()
+                        warning_lines.append(next_line)
+                        end_line_num = i + 1
+                        
+                        if self._is_sentence_complete(next_line):
+                            break
+                        i += 1
+                
+                # Store complete warning
                 self.warnings.append({
-                    "line": line,
-                    "line_number": line_num
+                    "text": " ".join(warning_lines),
+                    "start_line": start_line_num,
+                    "end_line": end_line_num
                 })
             
             # Parse program usage
             elif self._is_program_line(line):
-                self.programs.append({
-                    "line": line,
-                    "line_number": line_num
-                })
+                self.programs.append({"line": line, "line_number": line_num})
             
             # Parse energies
             elif self._is_energy_line(line):
-                self.energies.append({
-                    "line": line,
-                    "line_number": line_num
-                })
-        
+                self.energies.append({"line": line, "line_number": line_num})
+            
+            i += 1
+
         return {
             "warnings": self.warnings,
             "programs": self.programs,
             "energies": self.energies,
-            "has_output": bool(self.warnings or self.programs or self.energies)
+            "has_output": bool(self.warnings or self.programs or self.energies),
         }
-    
+
     def _is_warning_line(self, line: str) -> bool:
         """Check if line contains a warning"""
         warning_patterns = [
-            r"Warning:",
-            r"WARNING:",
-            r"UserWarning:",
-            r"^.*[Ww]arning.*$",
+            r"^Warning:",
+            r"^WARNING:",
+            r"^UserWarning:",
         ]
         
         for pattern in warning_patterns:
@@ -231,6 +241,11 @@ class OutputParser:
                 return True
         return False
     
+    def _is_sentence_complete(self, line: str) -> bool:
+        """Check if a line forms a complete sentence"""
+        stripped = line.strip()
+        return stripped.endswith(('.', '!', '?', ':'))
+
     def _is_program_line(self, line: str) -> bool:
         """Check if line contains program usage information"""
         program_patterns = [
@@ -240,12 +255,12 @@ class OutputParser:
             r"CASCI\([^)]+\)\s+using program\s+\w+",
             r"MC-PDFT\([^)]+\)\s+using program\s+\w+",
         ]
-        
+
         for pattern in program_patterns:
             if re.search(pattern, line):
                 return True
         return False
-    
+
     def _is_energy_line(self, line: str) -> bool:
         """Check if line contains energy information"""
         energy_patterns = [
@@ -255,38 +270,63 @@ class OutputParser:
             r"CASCI E\s*=\s*[-+]?\d*\.\d+",
             r"E\(\w+\)\s*=\s*[-+]?\d*\.\d+\s*a\.u\.",
         ]
-        
+
         for pattern in energy_patterns:
             if re.search(pattern, line):
                 return True
         return False
-    
-    def format_preview(self, parsed_data: Dict) -> str:
+
+    def format_preview(
+        self, parsed_data: Dict, blocked_warnings: Optional[List[str]] = None
+    ) -> str:
         """Format parsed data for display in preview widget"""
         if not parsed_data.get("has_output", False):
             return "[dim]No output file found or no key information detected[/dim]"
-        
+
+        if blocked_warnings is None:
+            blocked_warnings = []
+
         sections = []
-        
-        # Format warnings
-        if parsed_data["warnings"]:
+
+        # Format warnings (filtered)
+        filtered_warnings = []
+        for warning in parsed_data["warnings"]:
+            is_blocked = False
+            for blocked_pattern in blocked_warnings:
+                if re.search(re.escape(blocked_pattern), warning["text"], re.IGNORECASE):
+                    is_blocked = True
+                    break
+            if not is_blocked:
+                filtered_warnings.append(warning)
+
+        if filtered_warnings:
             sections.append("[bold yellow]Warnings:[/bold yellow]")
-            for warning in parsed_data["warnings"]:
-                sections.append(f"[yellow]Line {warning['line_number']}: {warning['line']}[/yellow]")
+            for warning in filtered_warnings:
+                if warning["start_line"] == warning["end_line"]:
+                    line_info = f"Line {warning['start_line']}"
+                else:
+                    line_info = f"Lines {warning['start_line']}-{warning['end_line']}"
+                sections.append(
+                    f"[yellow]{line_info}: {warning['text']}[/yellow]"
+                )
             sections.append("")
-        
+
         # Format programs
         if parsed_data["programs"]:
             sections.append("[bold blue]Programs Used:[/bold blue]")
             for program in parsed_data["programs"]:
-                sections.append(f"[blue]Line {program['line_number']}: {program['line']}[/blue]")
+                sections.append(
+                    f"[blue]Line {program['line_number']}: {program['line']}[/blue]"
+                )
             sections.append("")
-        
+
         # Format energies
         if parsed_data["energies"]:
             sections.append("[bold green]Energies:[/bold green]")
             for energy in parsed_data["energies"]:
-                sections.append(f"[green]Line {energy['line_number']}: {energy['line']}[/green]")
+                sections.append(
+                    f"[green]Line {energy['line_number']}: {energy['line']}[/green]"
+                )
             sections.append("")
-        
+
         return "\n".join(sections)

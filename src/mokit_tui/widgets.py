@@ -36,15 +36,15 @@ class OutputPreview(Static):
             title += f" [dim]({self.output_file})[/dim]"
         if self.has_output:
             title += " [green]●[/green]"
-        
+
         self.update(f"{title}\n\n{content}")
-    
+
     def set_output_file(self, filepath: str):
         """Set the output file path"""
         self.output_file = filepath
         if not self.content:
             self.content = "[dim]Loading output file...[/dim]"
-    
+
     def set_no_output(self):
         """Set to show no output available"""
         self.has_output = False
