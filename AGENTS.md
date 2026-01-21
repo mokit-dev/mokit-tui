@@ -1,7 +1,7 @@
 # AGENTS.md - MOKIT TUI Development Guidelines
 
 ## Project Overview
-This is a Python Textual TUI application for Gaussian input generation with MOKIT integration. The app provides a terminal-based interface for generating quantum chemistry calculation inputs.
+This is a Python Textual TUI application for MOKIT input generation. The app provides a terminal-based interface for generating quantum chemistry calculation inputs.
 
 ## Build/Development Commands
 

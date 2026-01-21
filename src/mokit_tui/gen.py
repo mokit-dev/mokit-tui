@@ -4,7 +4,7 @@ from .parser import GJFParser
 
 
 class GJFGenerator:
-    """Generate Gaussian input files with mokit{} support"""
+    """Generate MOKIT input files with mokit{} support"""
 
     def __init__(self):
         self.methods = [
@@ -16,7 +16,7 @@ class GJFGenerator:
         ]
 
     def generate_gjf(self, sections: Dict, options: Dict) -> str:
-        """Generate Gaussian gjf content"""
+        """Generate gjf content"""
         gjf_lines = []
 
         # Route section

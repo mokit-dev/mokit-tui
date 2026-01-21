@@ -9,7 +9,7 @@ class InputPreview(Static):
 
     def watch_content(self, content: str) -> None:
         """Update display when content changes"""
-        self.update(f"[b]Gaussian Input Preview:[/b]\n\n{content}")
+        self.update(f"[b]MOKIT Input Preview:[/b]\n\n{content}")
 
 
 class TemplateInfo(Static):

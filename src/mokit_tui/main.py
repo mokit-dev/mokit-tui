@@ -19,7 +19,7 @@ from .workflow import *
 def parse_cli_args(args=None):
     """Parse command-line arguments for debugging options"""
     parser = argparse.ArgumentParser(
-        description="MOKIT TUI for Gaussian input generation"
+        description="MOKIT TUI"
     )
     parser.add_argument("template_file", help="Template GJF file to load")
     parser.add_argument(
@@ -41,7 +41,7 @@ def parse_cli_args(args=None):
 
 
 class MTUI(App):
-    """TUI for Gaussian input generation"""
+    """TUI for MOKIT input generation"""
 
     CSS = CSS
 
@@ -142,7 +142,7 @@ class MTUI(App):
             )
 
     def generate_input(self) -> str:
-        """Generate Gaussian input"""
+        """Generate MOKIT input"""
         if not self.template_sections:
             return "# No template loaded\n\nPlease load a template .gjf file.\n\nmokit{}\n\n0 1"
 

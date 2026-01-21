@@ -7,7 +7,7 @@ class GJFParser:
 
     @staticmethod
     def parse_gjf(filepath: str) -> Dict:
-        """Parse a Gaussian gjf file into sections"""
+        """Parse a gjf file into sections"""
         with open(filepath, "r") as f:
             content = f.read()
 
