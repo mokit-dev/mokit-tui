@@ -5,11 +5,7 @@ from textual import on
 import subprocess
 import sys
 import argparse
-import re
-from typing import cast
 from pathlib import Path
-
-from automr.anal_fch import dump_mo_composition_fch, get_noon_from_fch
 
 if __package__ is None:
     from pathlib import Path as _Path
@@ -18,6 +14,7 @@ if __package__ is None:
     _sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 
 from mokit_tui.parser import GJFParser, OutputParser
+import mokit_tui.parser as parser
 from mokit_tui.gen import GJFGenerator
 from mokit_tui.widgets import InputPreview, TemplateInfo, OutputPreview
 from mokit_tui.screens import OutputScreen, SettingsScreen, NextStepScreen
@@ -313,7 +310,9 @@ class MTUI(App):
                 formatted_output = self.output_parser.format_preview(
                     parsed_data, self.options.get("blocked_warnings", [])
                 )
-                fch_info = self.get_fch_preview_info(gjf_path, output_file)
+                fch_info = parser.FchPreviewParser.get_fch_preview_info(  # type: ignore[attr-defined]
+                    gjf_path, output_file
+                )
                 if fch_info:
                     formatted_output = f"{formatted_output}\n\n{fch_info}"
 
@@ -345,234 +344,6 @@ class MTUI(App):
                 output_preview.set_no_output()
             except:
                 pass
-
-    def get_fch_preview_info(self, gjf_path: str, output_file: str) -> str:
-        """Extract fch information for the output preview"""
-        base_path = Path(gjf_path)
-        pattern = f"{base_path.stem}_*_CASSCF_NO.fch"
-        candidates = sorted(base_path.parent.glob(pattern))
-        if not candidates:
-            return "[dim]fch info: No matching fch file found[/dim]"
-
-        fch_file = max(candidates, key=lambda path: path.stat().st_mtime)
-        try:
-            noon_values = get_noon_from_fch(str(fch_file))
-            composition = dump_mo_composition_fch(str(fch_file))
-            active_space = self.parse_active_space(output_file)
-            active_space = self.normalize_active_space(active_space, len(noon_values))
-        except Exception as exc:
-            return f"[dim]fch info: Failed to read {fch_file.name}: {exc}[/dim]"
-
-        lines = ["[bold magenta]fch info:[/bold magenta]"]
-        lines.append(f"[magenta]File: {fch_file.name}[/magenta]")
-
-        if noon_values is not None:
-            noon_list = list(noon_values)
-            active_noons, total_count = self.filter_active_noons(
-                noon_list, active_space
-            )
-            mismatch_line = self.format_orbital_count_check(active_space, total_count)
-            display_count = min(len(active_noons), 20)
-            formatted_noons = ", ".join(
-                f"{value:.6f}" if isinstance(value, (int, float)) else str(value)
-                for value in active_noons[:display_count]
-            )
-            if len(active_noons) > display_count:
-                formatted_noons += f", ... ({len(active_noons)} total)"
-            elif total_count is not None and len(active_noons) != total_count:
-                formatted_noons += f" ({len(active_noons)} of {total_count})"
-            lines.append(f"[magenta]NOONs: {formatted_noons}[/magenta]")
-            if mismatch_line:
-                lines.append(mismatch_line)
-            active_space_lines = self.format_active_space(active_space)
-            if active_space_lines:
-                lines.extend(active_space_lines)
-
-        composition_text = self.format_mo_composition(composition, active_space)
-        lines.append(f"[magenta]MO composition:[/magenta]")
-        lines.extend(composition_text)
-        return "\n".join(lines)
-
-    @staticmethod
-    def parse_active_space(output_file: str) -> dict:
-        """Parse active space data from output log"""
-        active_space: dict = {}
-        in_do_cas_section = False
-
-        with open(output_file, "r") as handle:
-            for line in handle:
-                if "Enter subroutine do_cas" in line:
-                    in_do_cas_section = True
-                    continue
-
-                if not in_do_cas_section:
-                    continue
-
-                casscf_match = re.search(r"CASSCF\((\d+)e,\s*(\d+)o\)", line)
-                if casscf_match:
-                    active_space["active_electrons"] = int(casscf_match.group(1))
-                    active_space["nacto"] = int(casscf_match.group(2))
-
-                docc_match = re.search(r"doubly_occ\s*=\s*(\d+)", line)
-                if docc_match:
-                    active_space["ndb"] = int(docc_match.group(1))
-
-                vir_match = re.search(r"nvir\s*=\s*(\d+)", line)
-                if vir_match:
-                    active_space["nvir"] = int(vir_match.group(1))
-
-        return active_space
-
-    @staticmethod
-    def normalize_active_space(active_space: dict, total_count: int) -> dict:
-        """Normalize active space values to ensure consistent counts"""
-        normalized = dict(active_space)
-        nacto = normalized.get("nacto")
-        ndb = normalized.get("ndb")
-        nvir = normalized.get("nvir")
-
-        if not isinstance(nacto, int):
-            raise ValueError("Missing nacto in output log")
-        if not isinstance(ndb, int):
-            raise ValueError("Missing ndb in output log")
-        if not isinstance(nvir, int):
-            raise ValueError("Missing nvir in output log")
-
-        expected = ndb + nacto + nvir
-        if expected != total_count:
-            raise ValueError(
-                "Active space counts do not match NOON total: "
-                f"{expected} vs {total_count}"
-            )
-
-        return normalized
-
-    @staticmethod
-    def format_active_space(active_space: dict) -> list[str]:
-        """Format active space info for preview"""
-        label_map = {
-            "active_electrons": "Active Electrons",
-            "nacto": "NACTO",
-            "ndb": "NDB",
-            "nvir": "NVIR",
-        }
-        lines = ["[bold magenta]Active Space:[/bold magenta]"]
-        for key in ("active_electrons", "nacto", "ndb", "nvir"):
-            if key in active_space:
-                value = active_space[key]
-                lines.append(
-                    f"[magenta]{label_map[key]}: {value}[/magenta]"
-                )
-            else:
-                lines.append(f"[dim]{label_map[key]}: n/a[/dim]")
-        return lines
-
-    @staticmethod
-    def filter_active_noons(noon_list: list, active_space: dict) -> tuple[list, int | None]:
-        """Filter NOONs to active space range"""
-        total_count = len(noon_list)
-
-        start_index, end_index = MTUI.get_active_range(active_space, total_count)
-        if start_index is not None and end_index is not None:
-            return noon_list[start_index:end_index], total_count
-
-        return noon_list, total_count
-
-    @staticmethod
-    def format_orbital_count_check(active_space: dict, total_count: int | None) -> str:
-        """Check total orbital count against docc/active/vir values"""
-        if total_count is None:
-            return ""
-
-        ndb = active_space.get("ndb")
-        nacto = active_space.get("nacto")
-        nvir = active_space.get("nvir")
-
-        if not isinstance(ndb, int):
-            return ""
-        if not isinstance(nacto, int):
-            return ""
-        if not isinstance(nvir, int):
-            return ""
-
-        ndb_value = cast(int, ndb)
-        nacto_value = cast(int, nacto)
-        nvir_value = cast(int, nvir)
-        expected = ndb_value + nacto_value + nvir_value
-        if expected == total_count:
-            return "[magenta]Orbitals: total matches ndb+nacto+nvir[/magenta]"
-        return (
-            "[yellow]Orbitals mismatch: "
-            f"total {total_count} vs ndb+nacto+nvir {expected}[/yellow]"
-        )
-
-    @staticmethod
-    def format_mo_composition(composition, active_space: dict) -> list[str]:
-        """Format MO composition data into single-line entries"""
-        if not composition:
-            return ["[magenta]MO composition: (empty)[/magenta]"]
-
-        if isinstance(composition, dict):
-            items = [composition]
-        else:
-            try:
-                items = list(composition)
-            except TypeError:
-                items = [composition]
-
-        start_index, end_index = MTUI.get_active_range(active_space, len(items))
-
-        if start_index is not None and end_index is not None:
-            filtered_items = items[start_index:end_index]
-            start_number = start_index + 1
-        else:
-            filtered_items = items
-            start_number = 1
-
-        lines = []
-        for offset, mo in enumerate(filtered_items, start=0):
-            index = start_number + offset
-            if isinstance(mo, dict):
-                parts = []
-                for key, value in mo.items():
-                    if isinstance(value, float):
-                        value_text = f"{value:.3f}"
-                    else:
-                        value_text = str(value)
-                    parts.append(f"{key} {value_text}")
-                detail = ", ".join(parts) if parts else str(mo)
-            else:
-                detail = str(mo)
-            lines.append(f"[magenta]MO #{index}: {detail}[/magenta]")
-
-        max_lines = 50
-        if len(lines) > max_lines:
-            lines = lines[:max_lines]
-            lines.append("[magenta]... (truncated)[/magenta]")
-        return lines
-
-    @staticmethod
-    def get_active_range(active_space: dict, total_count: int | None) -> tuple[int | None, int | None]:
-        """Get active space indices based on orbital counts"""
-        ndb = active_space.get("ndb")
-        nacto = active_space.get("nacto")
-        nvir = active_space.get("nvir")
-
-        if isinstance(ndb, int) and isinstance(nacto, int):
-            start_index = ndb
-            end_index = ndb + nacto
-            return start_index, end_index
-
-        if (
-            isinstance(nacto, int)
-            and isinstance(nvir, int)
-            and isinstance(total_count, int)
-        ):
-            inferred_ndb = total_count - nacto - nvir
-            if inferred_ndb >= 0:
-                return inferred_ndb, inferred_ndb + nacto
-
-        return None, None
 
     def update_output_preview(self) -> None:
         """Update output preview box"""
