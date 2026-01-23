@@ -140,7 +140,7 @@ class NextStepScreen(ModalScreen):
     """Screen for prepare next step - simplified overlay"""
 
     def compose(self):
-        # Get FCH files
+        # Get fch files
         fch_files = list(Path(".").glob("*.fch"))
         fch_options = (
             [(f.name, f.name) for f in fch_files] if fch_files else [("No files", "")]
@@ -149,7 +149,7 @@ class NextStepScreen(ModalScreen):
         yield Container(
             Static("Prepare Next Step"),
             Horizontal(
-                Label("FCH File:"),
+                Label("fch File:"),
                 Select(fch_options, id="fch-select", prompt="Select file"),
                 Button("Prepare", variant="primary", id="prepare-btn"),
             ),
@@ -163,7 +163,7 @@ class NextStepScreen(ModalScreen):
             Static("📝 [b]Prepare Next Step[/b]", classes="dialog-title"),
             Container(
                 Horizontal(
-                    Label("FCH File:", classes="label"),
+                    Label("fch File:", classes="label"),
                     Select(
                         [],
                         id="fch-select",
@@ -184,7 +184,7 @@ class NextStepScreen(ModalScreen):
 
     @on(Button.Pressed, "#prepare-btn")
     def on_prepare(self):
-        # Get selected FCH file and prepare it
+        # Get selected fch file and prepare it
         fch_file = self.query_one("#fch-select", Select).value
         self.dismiss({"prepare": True, "fch_file": fch_file})
 

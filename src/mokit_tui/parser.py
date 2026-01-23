@@ -218,7 +218,7 @@ class OutputParser:
             # Parse energies
             elif self._is_energy_line(line):
                 self.energies.append({"line": line, "line_number": line_num})
-            
+
             i += 1
 
         return {
@@ -275,6 +275,7 @@ class OutputParser:
             if re.search(pattern, line):
                 return True
         return False
+
 
     def format_preview(
         self, parsed_data: Dict, blocked_warnings: Optional[List[str]] = None

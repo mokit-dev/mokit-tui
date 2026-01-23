@@ -38,6 +38,11 @@ To run a specific test case file:
 python main.py testcase/vn/filename.py
 ```
 
+Default testcase for agent-run checks:
+```bash
+python main.py testcase/vn/vn.gjf
+```
+
 ## Code Style Guidelines
 
 ### Import Organization
@@ -130,7 +135,7 @@ except Exception as e:
 - The application uses Textual framework for TUI
 - Backend execution calls `xxx` command (placeholder for actual quantum chemistry program)
 - Template files use `mokit{}` syntax for options
-- FCH files are used for calculation step sequencing
+- fch files are used for calculation step sequencing
 - Output files are automatically detected and loaded alongside templates
 
 ### Type Checking Notes

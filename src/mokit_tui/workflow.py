@@ -3,11 +3,11 @@ from .widgets import *
 from pathlib import Path
 
 
-# Update prepare_next_step() method to use selected FCH file:
+# Update prepare_next_step() method to use selected fch file:
 def prepare_next_step(self) -> None:
     """Prepare input for next calculation step"""
     try:
-        # Get selected FCH file
+        # Get selected fch file
         fch_select = self.query_one("#fch-select", Select)
         selected_fch = fch_select.value if fch_select.value else "default.fch"
 
@@ -63,7 +63,7 @@ def prepare_next_step(self) -> None:
         )
 
         self.notify(
-            f"Next step prepared: {new_filename}\nUsing FCH: {selected_fch}",
+            f"Next step prepared: {new_filename}\nUsing fch: {selected_fch}",
             severity="success",
             timeout=0,
         )
@@ -73,7 +73,7 @@ def prepare_next_step(self) -> None:
 
 
 def populate_fch_files(self) -> None:
-    """Populate FCH file dropdown"""
+    """Populate fch file dropdown"""
     fch_select = self.query_one("#fch-select", Select)
     fch_files = list(Path(".").glob("*.fch"))
     fch_files += list(Path(".").glob("*.FCH"))
