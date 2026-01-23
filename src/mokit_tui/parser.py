@@ -346,7 +346,11 @@ class FchPreviewParser:
     """Parse fch data for preview display"""
 
     @staticmethod
-    def get_fch_preview_info(gjf_path: str, output_file: str) -> str:
+    def get_fch_preview_info(
+        gjf_path: str,
+        output_file: str,
+        mode: str = "combined",
+    ) -> str:
         """Extract fch information for the output preview"""
         if dump_mo_composition_fch is None or get_noon_from_fch is None:
             return "[dim]fch info: pyAutoMR is not available[/dim]"
@@ -378,27 +382,35 @@ class FchPreviewParser:
             mismatch_line = FchPreviewParser.format_orbital_count_check(
                 active_space, total_count
             )
-            display_count = min(len(active_noons), 20)
-            formatted_noons = ", ".join(
-                f"{value:.6f}" if isinstance(value, (int, float)) else str(value)
-                for value in active_noons[:display_count]
-            )
-            if len(active_noons) > display_count:
-                formatted_noons += f", ... ({len(active_noons)} total)"
-            elif total_count is not None and len(active_noons) != total_count:
-                formatted_noons += f" ({len(active_noons)} of {total_count})"
-            lines.append(f"[magenta]NOONs: {formatted_noons}[/magenta]")
-            if mismatch_line:
-                lines.append(mismatch_line)
             active_space_lines = FchPreviewParser.format_active_space(active_space)
             if active_space_lines:
                 lines.extend(active_space_lines)
+            if mismatch_line:
+                lines.append(mismatch_line)
 
-        composition_text = FchPreviewParser.format_mo_composition(
-            composition, active_space
-        )
-        lines.append("[magenta]MO composition:[/magenta]")
-        lines.extend(composition_text)
+            if mode == "combined":
+                combined_lines = FchPreviewParser.format_noons_with_composition(
+                    active_noons, composition, active_space
+                )
+                lines.append("[magenta]NOONs | MO composition:[/magenta]")
+                lines.extend(combined_lines)
+            else:
+                display_count = min(len(active_noons), 20)
+                formatted_noons = ", ".join(
+                    f"{value:.6f}" if isinstance(value, (int, float)) else str(value)
+                    for value in active_noons[:display_count]
+                )
+                if len(active_noons) > display_count:
+                    formatted_noons += f", ... ({len(active_noons)} total)"
+                elif total_count is not None and len(active_noons) != total_count:
+                    formatted_noons += f" ({len(active_noons)} of {total_count})"
+                lines.append(f"[magenta]NOONs: {formatted_noons}[/magenta]")
+
+                composition_text = FchPreviewParser.format_mo_composition(
+                    composition, active_space
+                )
+                lines.append("[magenta]MO composition:[/magenta]")
+                lines.extend(composition_text)
         return "\n".join(lines)
 
     @staticmethod
@@ -554,6 +566,76 @@ class FchPreviewParser:
             else:
                 detail = str(mo)
             lines.append(f"[magenta]MO #{index}: {detail}[/magenta]")
+
+        max_lines = 50
+        if len(lines) > max_lines:
+            lines = lines[:max_lines]
+            lines.append("[magenta]... (truncated)[/magenta]")
+        return lines
+
+    @staticmethod
+    def format_noons_with_composition(
+        active_noons: list,
+        composition,
+        active_space: dict,
+    ) -> list[str]:
+        """Format NOONs with MO composition in two columns"""
+        if not composition:
+            return ["[magenta]NOONs | MO composition: (empty)[/magenta]"]
+
+        if isinstance(composition, dict):
+            items = [composition]
+        else:
+            try:
+                items = list(composition)
+            except TypeError:
+                items = [composition]
+
+        start_index, end_index = FchPreviewParser.get_active_range(
+            active_space, len(items)
+        )
+        if start_index is not None and end_index is not None:
+            filtered_items = items[start_index:end_index]
+            start_number = start_index + 1
+        else:
+            filtered_items = items
+            start_number = 1
+
+        row_count = min(len(active_noons), len(filtered_items))
+        index_width = max(len(str(start_number + row_count - 1)), 1) + 1
+        noon_width = 10
+        lines = [
+            f"[magenta]{'#':>{index_width}} {'NOON':>{noon_width}} | Composition[/magenta]"
+        ]
+        for offset in range(row_count):
+            index = start_number + offset
+            noon_value = active_noons[offset]
+            if isinstance(noon_value, (int, float)):
+                noon_text = f"{noon_value:{noon_width}.6f}"
+            else:
+                noon_text = f"{str(noon_value):>{noon_width}}"
+            index_text = f"#{index}"
+
+            mo = filtered_items[offset]
+            if isinstance(mo, dict):
+                parts = []
+                for key, value in mo.items():
+                    if isinstance(value, float):
+                        value_text = f"{value:.3f}"
+                    else:
+                        value_text = str(value)
+                    parts.append(f"{key} {value_text}")
+                detail = ", ".join(parts) if parts else str(mo)
+            else:
+                detail = str(mo)
+            lines.append(
+                f"[magenta]{index_text:>{index_width}} {noon_text} | {detail}[/magenta]"
+            )
+
+        if len(active_noons) != len(filtered_items):
+            lines.append(
+                "[dim]NOON and MO counts differ; showing shared rows.[/dim]"
+            )
 
         max_lines = 50
         if len(lines) > max_lines:

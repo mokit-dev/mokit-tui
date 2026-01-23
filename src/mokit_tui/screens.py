@@ -136,6 +136,47 @@ class SettingsScreen(ModalScreen):
         method_select.value = self.current_options.get("method", "b3lyp")
 
 
+class UISettingsScreen(ModalScreen):
+    """Screen for UI settings"""
+
+    def __init__(self, preview_mode: str = "combined"):
+        super().__init__()
+        self.preview_mode = preview_mode
+
+    def compose(self):
+        preview_options = [
+            ("combined", "combined"),
+            ("split", "split"),
+        ]
+
+        yield Container(
+            Static("UI Settings"),
+            Horizontal(
+                Label("fch preview mode:"),
+                Select(preview_options, id="preview-mode-select"),
+            ),
+            Horizontal(
+                Button("Apply", variant="primary", id="apply-btn"),
+                Button("Cancel", id="cancel-btn"),
+            ),
+            id="ui-settings-dialog",
+        )
+
+    @on(Button.Pressed, "#apply-btn")
+    def on_apply(self):
+        preview_mode = self.query_one("#preview-mode-select", Select).value
+        self.dismiss({"preview_mode": preview_mode})
+
+    @on(Button.Pressed, "#cancel-btn")
+    def on_cancel(self):
+        self.dismiss(None)
+
+    def on_mount(self):
+        """Set initial preview mode value"""
+        preview_select = self.query_one("#preview-mode-select", Select)
+        preview_select.value = self.preview_mode
+
+
 class NextStepScreen(ModalScreen):
     """Screen for prepare next step - simplified overlay"""
 

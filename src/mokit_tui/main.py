@@ -17,7 +17,12 @@ from mokit_tui.parser import GJFParser, OutputParser
 import mokit_tui.parser as parser
 from mokit_tui.gen import GJFGenerator
 from mokit_tui.widgets import InputPreview, TemplateInfo, OutputPreview
-from mokit_tui.screens import OutputScreen, SettingsScreen, NextStepScreen
+from mokit_tui.screens import (
+    OutputScreen,
+    SettingsScreen,
+    NextStepScreen,
+    UISettingsScreen,
+)
 from mokit_tui.css import CSS
 
 from mokit_tui.workflow import *
@@ -65,6 +70,7 @@ class MTUI(App):
         self.next_step_fch = "default.fch"
         self.auto_settings = cli_args.auto_settings if cli_args else False
         self.auto_next_step = cli_args.auto_next_step if cli_args else False
+        self.preview_mode = "combined"
 
         self.options = {
             "method": "b3lyp",
@@ -91,6 +97,7 @@ class MTUI(App):
 
             with Horizontal(id="buttons"):
                 yield Button("Settings", variant="default", id="settings-btn")
+                yield Button("UI Settings", variant="default", id="ui-settings-btn")
                 yield Button("Next Step", variant="default", id="next-step-btn")
                 yield Button("Run", variant="default", id="run-btn")
                 yield Button("Save (s)", variant="default", id="save-btn")
@@ -311,7 +318,7 @@ class MTUI(App):
                     parsed_data, self.options.get("blocked_warnings", [])
                 )
                 fch_info = parser.FchPreviewParser.get_fch_preview_info(  # type: ignore[attr-defined]
-                    gjf_path, output_file
+                    gjf_path, output_file, mode=self.preview_mode
                 )
                 if fch_info:
                     formatted_output = f"{formatted_output}\n\n{fch_info}"
@@ -364,6 +371,17 @@ class MTUI(App):
                 self.update_preview()
 
         self.push_screen(settings_screen, handle_settings_result)
+
+    @on(Button.Pressed, "#ui-settings-btn")
+    def on_ui_settings_button(self):
+        ui_settings_screen = UISettingsScreen(self.preview_mode)
+
+        async def handle_ui_settings_result(result):
+            if result and result.get("preview_mode"):
+                self.preview_mode = result["preview_mode"]
+                self.update_output_preview()
+
+        self.push_screen(ui_settings_screen, handle_ui_settings_result)
 
     @on(Button.Pressed, "#next-step-btn")
     def on_next_step_button(self):

@@ -62,6 +62,14 @@ full NOON list.
 The preview also reports whether the total number of NOONs matches
 `ndb + nacto + nvir`.
 
+## fch Preview Mode
+
+The UI settings modal exposes a `fch preview mode` option with:
+
+- `combined` (default): show NOONs in a left column and MO composition in a
+  right column.
+- `split`: show NOONs and MO composition in separate blocks.
+
 ## MO Composition Preview
 
 MO composition is loaded using `automr.anal_fch.dump_mo_composition_fch`. Each
