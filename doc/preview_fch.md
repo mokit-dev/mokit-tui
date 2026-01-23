@@ -32,17 +32,13 @@ Active-space values are parsed from the output log. The parser looks for these
 lines after the marker `Enter subroutine do_cas`:
 
 - `CASSCF(Ne,No)` -> active electrons and active orbitals
-- `doubly_occ=...` -> number of doubly occupied orbitals
+- `doubly_occ=...` -> number of doubly occupied orbitals (stored as `ndb`)
 - `nvir=...` -> number of virtual orbitals
 
 The values are displayed in the preview under an `Active Space` section.
 
-If `doubly_occ` is missing but `active_orbitals` and `nvir` are present, the
-preview infers:
-
-```
-doubly_occ = total_orbitals - active_orbitals - nvir
-```
+Active-space parsing requires `nacto`, `ndb`, and `nvir` to be present. Missing
+values raise an error during preview.
 
 ## NOON Preview Logic
 
@@ -56,15 +52,15 @@ doubly occupied -> active -> virtual
 The slice range is computed as:
 
 ```
-start = doubly_occ
-end = doubly_occ + active_orbitals
+start = ndb
+end = ndb + nacto
 ```
 
 If no active-space indices are available, the preview falls back to showing the
 full NOON list.
 
 The preview also reports whether the total number of NOONs matches
-`doubly_occ + active_orbitals + nvir`.
+`ndb + nacto + nvir`.
 
 ## MO Composition Preview
 

@@ -411,11 +411,11 @@ class MTUI(App):
                 casscf_match = re.search(r"CASSCF\((\d+)e,\s*(\d+)o\)", line)
                 if casscf_match:
                     active_space["active_electrons"] = int(casscf_match.group(1))
-                    active_space["active_orbitals"] = int(casscf_match.group(2))
+                    active_space["nacto"] = int(casscf_match.group(2))
 
                 docc_match = re.search(r"doubly_occ\s*=\s*(\d+)", line)
                 if docc_match:
-                    active_space["doubly_occ"] = int(docc_match.group(1))
+                    active_space["ndb"] = int(docc_match.group(1))
 
                 vir_match = re.search(r"nvir\s*=\s*(\d+)", line)
                 if vir_match:
@@ -427,30 +427,44 @@ class MTUI(App):
     def normalize_active_space(active_space: dict, total_count: int) -> dict:
         """Normalize active space values to ensure consistent counts"""
         normalized = dict(active_space)
-        active_orbitals = normalized.get("active_orbitals")
+        nacto = normalized.get("nacto")
+        ndb = normalized.get("ndb")
         nvir = normalized.get("nvir")
 
-        if isinstance(active_orbitals, int) and isinstance(nvir, int):
-            inferred_docc = total_count - active_orbitals - nvir
-            if inferred_docc >= 0:
-                normalized.setdefault("doubly_occ", inferred_docc)
+        if not isinstance(nacto, int):
+            raise ValueError("Missing nacto in output log")
+        if not isinstance(ndb, int):
+            raise ValueError("Missing ndb in output log")
+        if not isinstance(nvir, int):
+            raise ValueError("Missing nvir in output log")
+
+        expected = ndb + nacto + nvir
+        if expected != total_count:
+            raise ValueError(
+                "Active space counts do not match NOON total: "
+                f"{expected} vs {total_count}"
+            )
 
         return normalized
 
     @staticmethod
     def format_active_space(active_space: dict) -> list[str]:
         """Format active space info for preview"""
+        label_map = {
+            "active_electrons": "Active Electrons",
+            "nacto": "NACTO",
+            "ndb": "NDB",
+            "nvir": "NVIR",
+        }
         lines = ["[bold magenta]Active Space:[/bold magenta]"]
-        for key in ("active_electrons", "active_orbitals", "doubly_occ", "nvir"):
+        for key in ("active_electrons", "nacto", "ndb", "nvir"):
             if key in active_space:
                 value = active_space[key]
                 lines.append(
-                    f"[magenta]{key.replace('_', ' ').title()}: {value}[/magenta]"
+                    f"[magenta]{label_map[key]}: {value}[/magenta]"
                 )
             else:
-                lines.append(
-                    f"[dim]{key.replace('_', ' ').title()}: n/a[/dim]"
-                )
+                lines.append(f"[dim]{label_map[key]}: n/a[/dim]")
         return lines
 
     @staticmethod
@@ -470,26 +484,26 @@ class MTUI(App):
         if total_count is None:
             return ""
 
-        doubly_occ = active_space.get("doubly_occ")
-        active_orbitals = active_space.get("active_orbitals")
+        ndb = active_space.get("ndb")
+        nacto = active_space.get("nacto")
         nvir = active_space.get("nvir")
 
-        if not isinstance(doubly_occ, int):
+        if not isinstance(ndb, int):
             return ""
-        if not isinstance(active_orbitals, int):
+        if not isinstance(nacto, int):
             return ""
         if not isinstance(nvir, int):
             return ""
 
-        doubly_occ_value = cast(int, doubly_occ)
-        active_orbitals_value = cast(int, active_orbitals)
+        ndb_value = cast(int, ndb)
+        nacto_value = cast(int, nacto)
         nvir_value = cast(int, nvir)
-        expected = doubly_occ_value + active_orbitals_value + nvir_value
+        expected = ndb_value + nacto_value + nvir_value
         if expected == total_count:
-            return "[magenta]Orbitals: total matches docc+active+vir[/magenta]"
+            return "[magenta]Orbitals: total matches ndb+nacto+nvir[/magenta]"
         return (
             "[yellow]Orbitals mismatch: "
-            f"total {total_count} vs docc+active+vir {expected}[/yellow]"
+            f"total {total_count} vs ndb+nacto+nvir {expected}[/yellow]"
         )
 
     @staticmethod
@@ -540,23 +554,23 @@ class MTUI(App):
     @staticmethod
     def get_active_range(active_space: dict, total_count: int | None) -> tuple[int | None, int | None]:
         """Get active space indices based on orbital counts"""
-        doubly_occ = active_space.get("doubly_occ")
-        active_orbitals = active_space.get("active_orbitals")
+        ndb = active_space.get("ndb")
+        nacto = active_space.get("nacto")
         nvir = active_space.get("nvir")
 
-        if isinstance(doubly_occ, int) and isinstance(active_orbitals, int):
-            start_index = doubly_occ
-            end_index = doubly_occ + active_orbitals
+        if isinstance(ndb, int) and isinstance(nacto, int):
+            start_index = ndb
+            end_index = ndb + nacto
             return start_index, end_index
 
         if (
-            isinstance(active_orbitals, int)
+            isinstance(nacto, int)
             and isinstance(nvir, int)
             and isinstance(total_count, int)
         ):
-            inferred_docc = total_count - active_orbitals - nvir
-            if inferred_docc >= 0:
-                return inferred_docc, inferred_docc + active_orbitals
+            inferred_ndb = total_count - nacto - nvir
+            if inferred_ndb >= 0:
+                return inferred_ndb, inferred_ndb + nacto
 
         return None, None
 
