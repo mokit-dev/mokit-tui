@@ -2,7 +2,11 @@ import re
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, cast
 
-from automr.anal_fch import dump_mo_composition_fch, get_noon_from_fch
+try:
+    from automr.anal_fch import dump_mo_composition_fch, get_noon_from_fch
+except ImportError:  # pragma: no cover - optional dependency
+    dump_mo_composition_fch = None
+    get_noon_from_fch = None
 
 __all__ = ["GJFParser", "OutputParser", "FchPreviewParser"]
 
@@ -344,6 +348,8 @@ class FchPreviewParser:
     @staticmethod
     def get_fch_preview_info(gjf_path: str, output_file: str) -> str:
         """Extract fch information for the output preview"""
+        if dump_mo_composition_fch is None or get_noon_from_fch is None:
+            return "[dim]fch info: pyAutoMR is not available[/dim]"
         base_path = Path(gjf_path)
         pattern = f"{base_path.stem}_*_CASSCF_NO.fch"
         candidates = sorted(base_path.parent.glob(pattern))
