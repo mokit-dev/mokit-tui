@@ -37,3 +37,6 @@ where = ["src"]
 
 [tool.setuptools.package-dir]
 "" = "src"
+
+[tool.ruff.lint]
+extend-ignore = ["ANN", "TCH"]

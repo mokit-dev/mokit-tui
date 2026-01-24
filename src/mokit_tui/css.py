@@ -21,7 +21,6 @@ CSS = """
         height: 100%;
         width: 1fr;
         padding: 1;
-        overflow-y: auto;
         background: $surface;
     }
     
@@ -31,6 +30,17 @@ CSS = """
     
     #output-preview {
         border-left: solid $primary;
+    }
+
+    #output-preview-core-scroll,
+    #output-preview-fch-scroll {
+        height: 1fr;
+        overflow-y: auto;
+        margin-top: 1;
+    }
+
+    #output-preview-fch-title {
+        margin-top: 1;
     }
     
     #buttons {

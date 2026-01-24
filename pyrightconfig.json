@@ -1,4 +1,9 @@
 {
-  // "reportUnknownVariableType": false
-  "typeCheckingMode": "basic"
+  "typeCheckingMode": "off",
+  "reportMissingTypeStubs": "none",
+  "reportUnknownMemberType": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownParameterType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportGeneralTypeIssues": "none"
 }

@@ -350,6 +350,7 @@ class FchPreviewParser:
         gjf_path: str,
         output_file: str,
         mode: str = "combined",
+        margin: int = 5,
     ) -> str:
         """Extract fch information for the output preview"""
         if dump_mo_composition_fch is None or get_noon_from_fch is None:
@@ -371,26 +372,23 @@ class FchPreviewParser:
         except Exception as exc:
             return f"[dim]fch info: Failed to read {fch_file.name}: {exc}[/dim]"
 
-        lines = ["[bold magenta]fch info:[/bold magenta]"]
-        lines.append(f"[magenta]File: {fch_file.name}[/magenta]")
+        lines = [f"[magenta]fch info: {fch_file.name}[/magenta]"]
 
         if noon_values is not None:
             noon_list = list(noon_values)
             active_noons, total_count = FchPreviewParser.filter_active_noons(
                 noon_list, active_space
             )
-            mismatch_line = FchPreviewParser.format_orbital_count_check(
-                active_space, total_count
-            )
             active_space_lines = FchPreviewParser.format_active_space(active_space)
             if active_space_lines:
                 lines.extend(active_space_lines)
-            if mismatch_line:
-                lines.append(mismatch_line)
 
             if mode == "combined":
                 combined_lines = FchPreviewParser.format_noons_with_composition(
-                    active_noons, composition, active_space
+                    noon_list,
+                    composition,
+                    active_space,
+                    margin,
                 )
                 lines.append("[magenta]NOONs | MO composition:[/magenta]")
                 lines.extend(combined_lines)
@@ -476,14 +474,15 @@ class FchPreviewParser:
             "ndb": "NDB",
             "nvir": "NVIR",
         }
-        lines = ["[bold magenta]Active Space:[/bold magenta]"]
+        parts = []
         for key in ("active_electrons", "nacto", "ndb", "nvir"):
+            label = label_map[key]
             if key in active_space:
-                value = active_space[key]
-                lines.append(f"[magenta]{label_map[key]}: {value}[/magenta]")
+                parts.append(f"{label}={active_space[key]}")
             else:
-                lines.append(f"[dim]{label_map[key]}: n/a[/dim]")
-        return lines
+                parts.append(f"{label}=n/a")
+        line = ", ".join(parts)
+        return [f"[bold magenta]Active Space:[/bold magenta] [magenta]{line}[/magenta]"]
 
     @staticmethod
     def filter_active_noons(noon_list: list, active_space: dict) -> tuple[list, int | None]:
@@ -578,6 +577,7 @@ class FchPreviewParser:
         active_noons: list,
         composition,
         active_space: dict,
+        margin: int,
     ) -> list[str]:
         """Format NOONs with MO composition in two columns"""
         if not composition:
@@ -591,51 +591,61 @@ class FchPreviewParser:
             except TypeError:
                 items = [composition]
 
-        start_index, end_index = FchPreviewParser.get_active_range(
-            active_space, len(items)
+        ranges = FchPreviewParser.get_preview_ranges(
+            active_space, len(items), margin
         )
-        if start_index is not None and end_index is not None:
-            filtered_items = items[start_index:end_index]
-            start_number = start_index + 1
-        else:
-            filtered_items = items
-            start_number = 1
+        rows = []
+        for region, start_index, end_index in ranges:
+            if start_index >= end_index:
+                continue
+            slice_items = items[start_index:end_index]
+            slice_noons = active_noons[start_index:end_index]
+            rows.append((region, start_index, slice_items, slice_noons))
 
-        row_count = min(len(active_noons), len(filtered_items))
-        index_width = max(len(str(start_number + row_count - 1)), 1) + 1
+        total_rows = sum(len(row[2]) for row in rows)
+        max_index = 0
+        if rows:
+            max_index = max(
+                start_index + len(slice_items)
+                for _, start_index, slice_items, _ in rows
+            )
+        index_width = max(len(str(max_index)), 1) + 1
         noon_width = 10
         lines = [
             f"[magenta]{'#':>{index_width}} {'NOON':>{noon_width}} | Composition[/magenta]"
         ]
-        for offset in range(row_count):
-            index = start_number + offset
-            noon_value = active_noons[offset]
-            if isinstance(noon_value, (int, float)):
-                noon_text = f"{noon_value:{noon_width}.6f}"
-            else:
-                noon_text = f"{str(noon_value):>{noon_width}}"
-            index_text = f"#{index}"
+        for region, start_index, slice_items, slice_noons in rows:
+            region_color = {
+                "docc": "cyan",
+                "active": "magenta",
+                "vir": "green",
+            }.get(region, "magenta")
+            for offset, mo in enumerate(slice_items):
+                index = start_index + offset + 1
+                noon_value = slice_noons[offset] if offset < len(slice_noons) else ""
+                if isinstance(noon_value, (int, float)):
+                    noon_text = f"{noon_value:{noon_width}.6f}"
+                else:
+                    noon_text = f"{str(noon_value):>{noon_width}}"
+                index_text = f"#{index}"
 
-            mo = filtered_items[offset]
-            if isinstance(mo, dict):
-                parts = []
-                for key, value in mo.items():
-                    if isinstance(value, float):
-                        value_text = f"{value:.3f}"
-                    else:
-                        value_text = str(value)
-                    parts.append(f"{key} {value_text}")
-                detail = ", ".join(parts) if parts else str(mo)
-            else:
-                detail = str(mo)
-            lines.append(
-                f"[magenta]{index_text:>{index_width}} {noon_text} | {detail}[/magenta]"
-            )
+                if isinstance(mo, dict):
+                    parts = []
+                    for key, value in mo.items():
+                        if isinstance(value, float):
+                            value_text = f"{value:.3f}"
+                        else:
+                            value_text = str(value)
+                        parts.append(f"{key} {value_text}")
+                    detail = ", ".join(parts) if parts else str(mo)
+                else:
+                    detail = str(mo)
+                lines.append(
+                    f"[{region_color}]{index_text:>{index_width}} {noon_text} | {detail}[/{region_color}]"
+                )
 
-        if len(active_noons) != len(filtered_items):
-            lines.append(
-                "[dim]NOON and MO counts differ; showing shared rows.[/dim]"
-            )
+        if total_rows == 0:
+            lines.append("[dim]No orbitals matched preview ranges.[/dim]")
 
         max_lines = 50
         if len(lines) > max_lines:
@@ -665,3 +675,33 @@ class FchPreviewParser:
                 return inferred_ndb, inferred_ndb + nacto
 
         return None, None
+
+    @staticmethod
+    def get_preview_ranges(
+        active_space: dict,
+        total_count: int,
+        margin: int,
+    ) -> list[tuple[str, int, int]]:
+        """Get docc/active/vir ranges with margin"""
+        ndb = active_space.get("ndb")
+        nacto = active_space.get("nacto")
+        nvir = active_space.get("nvir")
+
+        if not all(isinstance(value, int) for value in (ndb, nacto, nvir)):
+            return []
+
+        ndb_value = cast(int, ndb)
+        nacto_value = cast(int, nacto)
+        nvir_value = cast(int, nvir)
+        active_start = ndb_value
+        active_end = ndb_value + nacto_value
+        docc_start = max(0, ndb_value - margin)
+        docc_end = ndb_value
+        vir_start = active_end
+        vir_end = min(total_count, active_end + margin, ndb_value + nacto_value + nvir_value)
+
+        return [
+            ("docc", docc_start, docc_end),
+            ("active", active_start, active_end),
+            ("vir", vir_start, vir_end),
+        ]

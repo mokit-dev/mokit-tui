@@ -70,6 +70,13 @@ The UI settings modal exposes a `fch preview mode` option with:
   right column.
 - `split`: show NOONs and MO composition in separate blocks.
 
+The combined mode expands the preview with a configurable margin. It shows
+extra orbitals before and after the active space and colors rows by region:
+
+- docc: cyan
+- active: magenta
+- vir: green
+
 ## MO Composition Preview
 
 MO composition is loaded using `automr.anal_fch.dump_mo_composition_fch`. Each

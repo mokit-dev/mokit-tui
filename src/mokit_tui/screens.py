@@ -139,9 +139,10 @@ class SettingsScreen(ModalScreen):
 class UISettingsScreen(ModalScreen):
     """Screen for UI settings"""
 
-    def __init__(self, preview_mode: str = "combined"):
+    def __init__(self, preview_mode: str = "combined", preview_margin: int = 5):
         super().__init__()
         self.preview_mode = preview_mode
+        self.preview_margin = preview_margin
 
     def compose(self):
         preview_options = [
@@ -156,6 +157,14 @@ class UISettingsScreen(ModalScreen):
                 Select(preview_options, id="preview-mode-select"),
             ),
             Horizontal(
+                Label("fch preview margin:"),
+                Input(
+                    value=str(self.preview_margin),
+                    placeholder="5",
+                    id="preview-margin-input",
+                ),
+            ),
+            Horizontal(
                 Button("Apply", variant="primary", id="apply-btn"),
                 Button("Cancel", id="cancel-btn"),
             ),
@@ -165,7 +174,11 @@ class UISettingsScreen(ModalScreen):
     @on(Button.Pressed, "#apply-btn")
     def on_apply(self):
         preview_mode = self.query_one("#preview-mode-select", Select).value
-        self.dismiss({"preview_mode": preview_mode})
+        preview_margin = self.query_one("#preview-margin-input", Input).value
+        self.dismiss({
+            "preview_mode": preview_mode,
+            "preview_margin": preview_margin,
+        })
 
     @on(Button.Pressed, "#cancel-btn")
     def on_cancel(self):
@@ -175,6 +188,8 @@ class UISettingsScreen(ModalScreen):
         """Set initial preview mode value"""
         preview_select = self.query_one("#preview-mode-select", Select)
         preview_select.value = self.preview_mode
+        preview_input = self.query_one("#preview-margin-input", Input)
+        preview_input.value = str(self.preview_margin)
 
 
 class NextStepScreen(ModalScreen):

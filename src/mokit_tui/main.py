@@ -17,12 +17,8 @@ from mokit_tui.parser import GJFParser, OutputParser
 import mokit_tui.parser as parser
 from mokit_tui.gen import GJFGenerator
 from mokit_tui.widgets import InputPreview, TemplateInfo, OutputPreview
-from mokit_tui.screens import (
-    OutputScreen,
-    SettingsScreen,
-    NextStepScreen,
-    UISettingsScreen,
-)
+import mokit_tui.screens as screens  # type: ignore
+from mokit_tui.screens import OutputScreen, SettingsScreen, NextStepScreen
 from mokit_tui.css import CSS
 
 from mokit_tui.workflow import *
@@ -71,6 +67,7 @@ class MTUI(App):
         self.auto_settings = cli_args.auto_settings if cli_args else False
         self.auto_next_step = cli_args.auto_next_step if cli_args else False
         self.preview_mode = "combined"
+        self.preview_margin = 5
 
         self.options = {
             "method": "b3lyp",
@@ -318,15 +315,16 @@ class MTUI(App):
                     parsed_data, self.options.get("blocked_warnings", [])
                 )
                 fch_info = parser.FchPreviewParser.get_fch_preview_info(  # type: ignore[attr-defined]
-                    gjf_path, output_file, mode=self.preview_mode
+                    gjf_path,
+                    output_file,
+                    mode=self.preview_mode,
+                    margin=self.preview_margin,
                 )
-                if fch_info:
-                    formatted_output = f"{formatted_output}\n\n{fch_info}"
-
                 output_preview = self.query_one("#output-preview", OutputPreview)
                 output_preview.set_output_file(Path(output_file).name)
                 output_preview.has_output = parsed_data.get("has_output", False)
-                output_preview.content = formatted_output
+                output_preview.set_output_content(formatted_output)  # type: ignore[attr-defined]
+                output_preview.set_fch_content(fch_info)  # type: ignore[attr-defined]
 
                 # Show notification about successful loading
                 if parsed_data.get("has_output", False):
@@ -374,11 +372,20 @@ class MTUI(App):
 
     @on(Button.Pressed, "#ui-settings-btn")
     def on_ui_settings_button(self):
-        ui_settings_screen = UISettingsScreen(self.preview_mode)
+        ui_settings_screen = screens.UISettingsScreen(  # type: ignore[attr-defined]
+            self.preview_mode,
+            self.preview_margin,
+        )
 
         async def handle_ui_settings_result(result):
-            if result and result.get("preview_mode"):
-                self.preview_mode = result["preview_mode"]
+            if result:
+                if result.get("preview_mode"):
+                    self.preview_mode = result["preview_mode"]
+                if result.get("preview_margin") is not None:
+                    try:
+                        self.preview_margin = int(result["preview_margin"])
+                    except (TypeError, ValueError):
+                        self.preview_margin = 5
                 self.update_output_preview()
 
         self.push_screen(ui_settings_screen, handle_ui_settings_result)

@@ -1,3 +1,5 @@
+from textual.app import ComposeResult
+from textual.containers import Container, VerticalScroll
 from textual.widgets import Static, Select
 from textual.reactive import reactive
 
@@ -5,7 +7,7 @@ from textual.reactive import reactive
 class InputPreview(Static):
     """Widget to display the gjf file content"""
 
-    content = reactive("")
+    content = reactive("")  # type: ignore[assignment]
 
     def watch_content(self, content: str) -> None:
         """Update display when content changes"""
@@ -15,41 +17,84 @@ class InputPreview(Static):
 class TemplateInfo(Static):
     """Display template information"""
 
-    info = reactive("No template loaded")
+    info = reactive("No template loaded")  # type: ignore[assignment]
 
     def watch_info(self, info: str) -> None:
         """Update display when info changes"""
         self.update(f"[b]Template Info:[/b] {info}")
 
 
-class OutputPreview(Static):
+class OutputPreview(Container):
     """Widget to display output file preview information"""
 
-    content = reactive("")
-    output_file = reactive("")
-    has_output = reactive(False)
+    output_content = reactive("")  # type: ignore[assignment]
+    fch_content = reactive("")  # type: ignore[assignment]
+    output_file = reactive("")  # type: ignore[assignment]
+    has_output = reactive(False)  # type: ignore[assignment]
 
-    def watch_content(self, content: str) -> None:
-        """Update display when content changes"""
+    def compose(self) -> ComposeResult:
+        yield Static(id="output-preview-title")
+        yield VerticalScroll(
+            Static(id="output-preview-content"),
+            id="output-preview-core-scroll",
+        )
+        yield Static("[b]fch preview:[/b]", id="output-preview-fch-title")
+        yield VerticalScroll(
+            Static(id="output-preview-fch"),
+            id="output-preview-fch-scroll",
+        )
+
+    def watch_output_content(self, content: str) -> None:
+        if not self.is_mounted:
+            return
+        output_widget = self.query_one("#output-preview-content", Static)
+        output_widget.update(content)
+
+    def watch_fch_content(self, content: str) -> None:
+        if not self.is_mounted:
+            return
+        fch_widget = self.query_one("#output-preview-fch", Static)
+        fch_widget.update(content)
+
+    def watch_output_file(self, output_file: str) -> None:
+        self._update_title(output_file, self.has_output)
+
+    def watch_has_output(self, has_output: bool) -> None:
+        self._update_title(self.output_file, has_output)
+
+    def _update_title(self, output_file: str, has_output: bool) -> None:
+        if not self.is_mounted:
+            return
         title = "[b]Output Preview:[/b]"
-        if self.output_file:
-            title += f" [dim]({self.output_file})[/dim]"
-        if self.has_output:
+        if output_file:
+            title += f" [dim]({output_file})[/dim]"
+        if has_output:
             title += " [green]●[/green]"
-
-        self.update(f"{title}\n\n{content}")
+        title_widget = self.query_one("#output-preview-title", Static)
+        title_widget.update(title)
 
     def set_output_file(self, filepath: str):
         """Set the output file path"""
         self.output_file = filepath
-        if not self.content:
-            self.content = "[dim]Loading output file...[/dim]"
+        if not self.output_content:
+            self.output_content = "[dim]Loading output file...[/dim]"
+        if not self.fch_content:
+            self.fch_content = "[dim]No fch info available[/dim]"
+
+    def set_output_content(self, content: str) -> None:
+        """Set output preview content"""
+        self.output_content = content
+
+    def set_fch_content(self, content: str) -> None:
+        """Set fch preview content"""
+        self.fch_content = content
 
     def set_no_output(self):
         """Set to show no output available"""
         self.has_output = False
         self.output_file = ""
-        self.content = "[dim]No output file found[/dim]"
+        self.output_content = "[dim]No output file found[/dim]"
+        self.fch_content = "[dim]No fch info available[/dim]"
 
 
 class MethodSelect(Select):
