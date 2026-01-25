@@ -1,5 +1,4 @@
 from textual.widgets import Select
-from .widgets import *
 from pathlib import Path
 
 

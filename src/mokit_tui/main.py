@@ -26,7 +26,7 @@ import mokit_tui.screens as screens  # type: ignore
 from mokit_tui.screens import OutputScreen, SettingsScreen, NextStepScreen
 from mokit_tui.css import CSS
 
-from mokit_tui.workflow import *  # type: ignore
+from mokit_tui.workflow import populate_fch_files, prepare_next_step
 
 
 def parse_cli_args(args=None):
@@ -369,7 +369,7 @@ class MTUI(App):
             try:
                 output_preview = self.query_one("#output-preview", OutputPreview)
                 output_preview.set_no_output()
-            except:
+            except Exception:
                 pass
 
     def update_output_preview(self) -> None:
