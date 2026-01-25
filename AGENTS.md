@@ -144,6 +144,7 @@ except Exception as e:
 - Input/IO features: `doc/features_io.md`
 - Output preview summary: `doc/features_output.md`
 - fch preview details: `doc/preview_fch.md`
+- Versioning protocol: `doc/versioning.md`
 
 ### Type Checking Notes
 - pyright is configured for "basic" mode in pyrightconfig.json

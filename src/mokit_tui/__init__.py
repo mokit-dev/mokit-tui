@@ -1,6 +1,6 @@
 """MOKIT TUI"""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0rc1"
 
 from .parser import GJFParser
 from .gen import GJFGenerator
