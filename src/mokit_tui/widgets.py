@@ -21,7 +21,7 @@ class NextStepPreview(Static):
 
     def watch_content(self, content: str) -> None:
         """Update display when content changes"""
-        self.update(f"[b]Next Step Input Preview:[/b]\n\n{content}")
+        self.update(content)
 
 
 class TemplateInfo(Static):

@@ -1,4 +1,3 @@
-from textual.widgets import Select
 from pathlib import Path
 
 
@@ -8,6 +7,19 @@ def prepare_next_step(self, selected_fch: str | None = None) -> None:
     try:
         if selected_fch is None:
             selected_fch = None
+
+        original_mem = None
+        original_nprocshared = None
+        original_nproc = None
+        for line in self.template_text.splitlines():
+            stripped = line.strip()
+            lower = stripped.lower()
+            if lower.startswith("%mem=") and original_mem is None:
+                original_mem = stripped
+            elif lower.startswith("%nprocshared=") and original_nprocshared is None:
+                original_nprocshared = stripped
+            elif lower.startswith("%nproc=") and original_nproc is None:
+                original_nproc = stripped
 
         # 1. Generate current input
         current_content = self.generate_input()
@@ -36,7 +48,40 @@ def prepare_next_step(self, selected_fch: str | None = None) -> None:
                     line = f"{line}, readno={selected_fch}"
             modified_lines.append(line)
 
-        new_content = "\n".join(modified_lines)
+        cleaned_lines = []
+        for line in modified_lines:
+            stripped = line.strip()
+            lower = stripped.lower()
+            if lower.startswith("%chk="):
+                continue
+            if original_mem and lower.startswith("%mem="):
+                continue
+            if (original_nprocshared or original_nproc) and (
+                lower.startswith("%nprocshared=") or lower.startswith("%nproc=")
+            ):
+                continue
+            cleaned_lines.append(line)
+
+        insert_directives = []
+        if original_mem:
+            insert_directives.append(original_mem)
+        if original_nprocshared:
+            insert_directives.append(original_nprocshared)
+        elif original_nproc:
+            insert_directives.append(original_nproc)
+
+        if insert_directives:
+            insert_at = 0
+            while insert_at < len(cleaned_lines) and cleaned_lines[
+                insert_at
+            ].lstrip().startswith("%"):
+                insert_at += 1
+            cleaned_lines = (
+                cleaned_lines[:insert_at]
+                + insert_directives
+                + cleaned_lines[insert_at:]
+            )
+        new_content = "\n".join(cleaned_lines)
 
         # 3. Save to new file with timestamp
         from datetime import datetime

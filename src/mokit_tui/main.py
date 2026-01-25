@@ -1,6 +1,15 @@
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
-from textual.widgets import Header, Footer, Button, TabbedContent, TabPane
+from textual.widgets import Static
+from textual.widgets import (
+    Header,
+    Footer,
+    Button,
+    Label,
+    Select,
+    TabbedContent,
+    TabPane,
+)
 from textual import on
 import subprocess
 import sys
@@ -23,7 +32,7 @@ from mokit_tui.widgets import (
 )
 from mokit_tui.widgets import NextStepPreview  # type: ignore[attr-defined]
 import mokit_tui.screens as screens  # type: ignore
-from mokit_tui.screens import OutputScreen, SettingsScreen, NextStepScreen
+from mokit_tui.screens import OutputScreen, SettingsScreen
 from mokit_tui.css import CSS
 
 from mokit_tui.workflow import populate_fch_files, prepare_next_step
@@ -94,17 +103,26 @@ class MTUI(App):
         with Container(id="main-container"):
             yield TemplateInfo(id="template-info")
             with Container(id="preview-container"):
-                with TabbedContent(id="input-preview-tabs"):
-                    with TabPane("Input", id="input-preview-tab"):
-                        yield InputPreview(id="preview-box")
-                    with TabPane("Next Step", id="next-step-preview-tab"):
-                        yield NextStepPreview(id="next-step-preview")
+                with Container(id="input-panel"):
+                    with TabbedContent(id="input-preview-tabs"):
+                        with TabPane("Input", id="input-preview-tab"):
+                            yield InputPreview(id="preview-box")
+                        with TabPane("Next Step", id="next-step-preview-tab"):
+                            yield NextStepPreview(id="next-step-tab-preview")
+                    with Container(id="next-step-container", classes="is-hidden"):
+                        yield Static("[b]Next Step[/b]", id="next-step-title")
+                        with Horizontal(id="next-step-controls"):
+                            yield Label("fch file:", id="next-step-fch-label")
+                            yield Select([], id="next-step-fch-select")
+                            yield Button(
+                                "Prepare", variant="primary", id="next-step-prepare-btn"
+                            )
                 yield OutputPreview(id="output-preview")
 
             with Horizontal(id="buttons"):
                 yield Button("Settings", variant="default", id="settings-btn")
                 yield Button("UI Settings", variant="default", id="ui-settings-btn")
-                yield Button("Next Step", variant="default", id="next-step-btn")
+                yield Button("Next Step (n)", variant="default", id="next-step-btn")
                 yield Button("Run", variant="default", id="run-btn")
                 yield Button("Save (s)", variant="default", id="save-btn")
                 yield Button("Exit (q)", variant="error", id="exit-btn")
@@ -113,6 +131,8 @@ class MTUI(App):
         """Initialize application"""
         if self.template_file:
             self.load_template(self.template_file)
+
+        self.update_fch_select()
 
         # Set up automated debugging actions if CLI flags are set
         self.setup_auto_actions()
@@ -154,6 +174,7 @@ class MTUI(App):
 
             self.update_template_info(info)
             self.update_preview()
+            self.update_fch_select()
             self.load_output_if_exists(filepath)
 
             # self.notify(f"Template loaded. Title set to 'mokit{{}}'", severity="success")
@@ -194,8 +215,8 @@ class MTUI(App):
     def update_next_step_preview(self, content: str) -> None:
         """Update next step preview tab"""
         self.next_step_preview_content = content
-        preview = self.query_one("#next-step-preview", NextStepPreview)
-        preview.content = content  # type: ignore[attr-defined]
+        tab_preview = self.query_one("#next-step-tab-preview", NextStepPreview)
+        tab_preview.content = content  # type: ignore[attr-defined]
 
     def save_input_file(self) -> None:
         """Save to input.gjf"""
@@ -280,26 +301,13 @@ class MTUI(App):
         self.notify_persistent("Auto-opening settings modal...", severity="information")
 
     def auto_open_next_step(self) -> None:
-        """Programmatically open next step modal for debugging"""
+        """Programmatically prepare next step for debugging"""
         self.call_after_refresh(self._do_auto_open_next_step)
 
     def _do_auto_open_next_step(self) -> None:
-        """Internal method to open next step modal with delay"""
-        fch_options = self._get_fch_options()
-        next_step_screen = NextStepScreen(fch_options=fch_options)  # type: ignore[call-arg]
-
-        async def handle_next_step_result(result):
-            if result and result.get("prepare"):
-                selected_fch = result.get("fch_file")
-                if selected_fch:
-                    self.next_step_fch = selected_fch
-                self.prepare_next_step(selected_fch)
-            self.notify_persistent("Auto-next-step completed", severity="information")
-
-        self.push_screen(next_step_screen, handle_next_step_result)
-        self.notify_persistent(
-            "Auto-opening next step modal...", severity="information"
-        )
+        """Internal method to prepare next step with delay"""
+        self.call_after_refresh(self.on_next_step_prepare_inline)
+        self.notify_persistent("Auto-preparing next step...", severity="information")
 
     def setup_auto_actions(self) -> None:
         """Set up automated actions based on CLI flags"""
@@ -414,17 +422,30 @@ class MTUI(App):
 
     @on(Button.Pressed, "#next-step-btn")
     def on_next_step_button(self):
-        fch_options = self._get_fch_options()
-        next_step_screen = NextStepScreen(fch_options=fch_options)  # type: ignore[call-arg]
+        self.prepare_next_step_inline()
 
-        async def handle_next_step_result(result):
-            if result and result.get("prepare"):
-                selected_fch = result.get("fch_file")
-                if selected_fch:
-                    self.next_step_fch = selected_fch
-                self.prepare_next_step(selected_fch)
+    @on(Button.Pressed, "#next-step-prepare-btn")
+    def on_next_step_prepare_inline(self):
+        self.prepare_next_step_inline()
 
-        self.push_screen(next_step_screen, handle_next_step_result)
+    def prepare_next_step_inline(self) -> None:
+        self.show_next_step_container()
+        fch_select = self.query_one("#next-step-fch-select", Select)
+        selected_fch = fch_select.value
+        if selected_fch:
+            self.next_step_fch = selected_fch
+        self.prepare_next_step(selected_fch)
+
+    def show_next_step_container(self) -> None:
+        container = self.query_one("#next-step-container", Container)
+        container.remove_class("is-hidden")
+
+    def update_fch_select(self) -> None:
+        fch_select = self.query_one("#next-step-fch-select", Select)
+        options = self._get_fch_options()
+        fch_select.set_options(options)
+        if options:
+            fch_select.value = options[0][1]
 
     def _get_fch_options(self) -> list[tuple[str, str]]:
         search_dirs = {Path(".")}
@@ -470,6 +491,10 @@ class MTUI(App):
     def key_q(self) -> None:
         """esc to exit"""
         self.exit()
+
+    def key_n(self) -> None:
+        """n to prepare next step"""
+        self.prepare_next_step_inline()
 
 
 def main():

@@ -138,6 +138,13 @@ except Exception as e:
 - fch files are used for calculation step sequencing
 - Output files are automatically detected and loaded alongside templates
 
+### Docs Index
+- Summary and links: `doc/index.md`
+- UI features: `doc/features_ui.md`
+- Input/IO features: `doc/features_io.md`
+- Output preview summary: `doc/features_output.md`
+- fch preview details: `doc/preview_fch.md`
+
 ### Type Checking Notes
 - pyright is configured for "basic" mode in pyrightconfig.json
 - Focus on type hints for public APIs and critical paths

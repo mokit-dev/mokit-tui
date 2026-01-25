@@ -12,21 +12,54 @@ CSS = """
     }
     
     #preview-container {
-        height: 75%;
+        height: 85%;
         layout: horizontal;
         margin: 1 0;
     }
     
-    #input-preview-tabs, #output-preview {
+    #input-panel, #output-preview {
         height: 100%;
         width: 1fr;
         padding: 1;
         background: $surface;
     }
 
-    #input-preview-tabs {
+    #input-panel {
         border-right: solid $primary;
-        height: 100%;
+        layout: vertical;
+    }
+
+    #input-preview-tabs {
+        height: 1fr;
+    }
+
+    #preview-box {
+        height: 1fr;
+        min-height: 12;
+        padding-bottom: 1;
+        overflow-y: auto;
+    }
+
+    #next-step-container {
+        height: auto;
+        max-height: 12;
+        padding: 1;
+        margin-top: 1;
+        border: solid $primary;
+        background: $surface;
+        overflow-y: auto;
+    }
+
+    .is-hidden {
+        display: none;
+    }
+
+    #next-step-controls {
+        margin-top: 1;
+    }
+
+    #next-step-preview {
+        margin-top: 1;
     }
     
     #output-preview {
