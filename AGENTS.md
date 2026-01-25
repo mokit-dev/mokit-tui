@@ -7,19 +7,19 @@ This is a Python Textual TUI application for MOKIT input generation. The app pro
 
 ### Running the Application
 ```bash
-python main.py <template_file>.gjf
+python src/mokit_tui/main.py <template_file>.gjf
 ```
 
 ### Debug Mode Options
 ```bash
 # Auto-open settings modal on startup
-python main.py template.gjf -s
+python src/mokit_tui/main.py template.gjf -s
 
 # Auto-open next step modal on startup  
-python main.py template.gjf -n
+python src/mokit_tui/main.py template.gjf -n
 
 # Both auto-settings and auto-next-step
-python main.py template.gjf -s -n
+python src/mokit_tui/main.py template.gjf -s -n
 ```
 
 ### Linting and Type Checking
@@ -35,12 +35,12 @@ No formal test framework is currently configured. Test case files are located in
 
 To run a specific test case file:
 ```bash
-python main.py testcase/vn/filename.py
+python src/mokit_tui/main.py testcase/vn/filename.py
 ```
 
 Default testcase for agent-run checks:
 ```bash
-python main.py testcase/vn/vn.gjf
+python src/mokit_tui/main.py testcase/vn/vn.gjf
 ```
 
 ## Code Style Guidelines
@@ -68,7 +68,7 @@ from gen import GJFGenerator
 ```
 
 ### Type Hints
-- Use type hints for all function signatures and class attributes
+- Use type hints where they improve readability, but do not over-optimize typing
 - Import typing constructs as needed: `Dict`, `List`, `Tuple`, `Optional`
 - Keep type checking mode at "basic" per pyrightconfig.json
 - Example:
@@ -111,13 +111,13 @@ except Exception as e:
 - Use `self.push_screen()` to show modal screens
 
 ### File Organization
-- `main.py`: Main application class and entry point
-- `parser.py`: File parsing logic (GJFParser)
-- `gen.py`: File generation logic (GJFGenerator)  
-- `widgets.py`: Custom Textual widgets
-- `screens.py`: Modal screen classes
-- `css.py`: CSS styling constants
-- `workflow.py`: Workflow and utility functions
+- `src/mokit_tui/main.py`: Main application class and entry point
+- `src/mokit_tui/parser.py`: File parsing logic (GJFParser)
+- `src/mokit_tui/gen.py`: File generation logic (GJFGenerator)  
+- `src/mokit_tui/widgets.py`: Custom Textual widgets
+- `src/mokit_tui/screens.py`: Modal screen classes
+- `src/mokit_tui/css.py`: CSS styling constants
+- `src/mokit_tui/workflow.py`: Workflow and utility functions
 
 ### String Formatting
 - Use f-strings for string formatting
