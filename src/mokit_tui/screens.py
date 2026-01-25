@@ -1,8 +1,9 @@
 from textual.screen import ModalScreen
-from textual.containers import Container, Horizontal, VerticalScroll
-from textual.widgets import Static, Button, Input, Label, Select
-from textual import on
 from pathlib import Path
+
+from textual import on
+from textual.containers import Container, Horizontal, VerticalScroll
+from textual.widgets import Button, Input, Label, Select, Static
 
 
 class FileLoadScreen(ModalScreen):
@@ -63,23 +64,13 @@ class SettingsScreen(ModalScreen):
         self.current_options = current_options or {}
 
     def compose(self):
-        method_options = [
-            ("b3lyp", "b3lyp"),
-            ("hf", "HF"),
-            ("m062x", "M06-2X"),
-            ("mp2", "MP2"),
-            ("wb97xd", "ωB97X-D"),
-        ]
-
         yield Container(
             Static("Calculation Settings"),
             Horizontal(
-                Label("Method:"),
-                Select(method_options, id="method-select", prompt="Select method"),
                 Label("Basis:"),
                 Input(
-                    value=self.current_options.get("basis_set", "6-31g(d)"),
-                    placeholder="6-31g(d)",
+                    value=self.current_options.get("basis_set", ""),
+                    placeholder="",
                     id="basis-input",
                 ),
             ),
@@ -116,7 +107,6 @@ class SettingsScreen(ModalScreen):
     def on_apply(self):
         # Get all values and return them
         values = {
-            "method": self.query_one("#method-select", Select).value,
             "basis_set": self.query_one("#basis-input", Input).value,
             "processors": self.query_one("#proc-input", Input).value,
             "additional_keywords": self.query_one("#keywords-input", Input).value,
@@ -131,9 +121,8 @@ class SettingsScreen(ModalScreen):
         self.dismiss(None)
 
     def on_mount(self):
-        """Set initial method value"""
-        method_select = self.query_one("#method-select", Select)
-        method_select.value = self.current_options.get("method", "b3lyp")
+        """No-op mount hook for settings screen"""
+        return
 
 
 class UISettingsScreen(ModalScreen):

@@ -63,7 +63,9 @@ CSS = """
         margin-top: 0;
     }
 
+
     #next-step-basename-input,
+    #next-step-method-select,
     #next-step-fch-select {
         width: 1fr;
     }

@@ -1,7 +1,9 @@
 from textual.app import ComposeResult
 from textual.containers import Container, VerticalScroll
-from textual.widgets import Static, Select
 from textual.reactive import reactive
+from textual.widgets import Select, Static
+
+from mokit_tui.gen import GJFGenerator
 
 
 class InputPreview(Static):
@@ -111,14 +113,9 @@ class MethodSelect(Select):
     """Method selection widget"""
 
     def __init__(self, generator=None):
-        # Hardcode the options to avoid issues
-        options = [
-            ("b3lyp", "b3lyp"),
-            ("hf", "HF"),
-            ("m062x", "M06-2X"),
-            ("mp2", "MP2"),
-            ("wb97xd", "ωB97X-D"),
-        ]
+        if generator is None:
+            generator = GJFGenerator()
+        options = generator.get_methods()
 
         # Initialize parent class
         super().__init__(options, prompt="Select method")

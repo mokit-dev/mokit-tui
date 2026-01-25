@@ -8,11 +8,25 @@ class GJFGenerator:
 
     def __init__(self):
         self.methods = [
-            ("b3lyp", "B3LYP"),
-            ("hf", "HF"),
-            ("m062x", "M06-2X"),
-            ("mp2", "MP2"),
-            ("wb97xd", "ωB97X-D"),
+            ("GVB", "GVB"),
+            ("CASCI", "CASCI"),
+            ("CASSCF", "CASSCF"),
+            ("DMRGCI", "DMRGCI"),
+            ("DMRGSCF", "DMRGSCF"),
+            ("NEVPT2", "NEVPT2"),
+            ("CASPT2", "CASPT2"),
+            ("CASPT2K", "CASPT2K"),
+            ("CASPT3", "CASPT3"),
+            ("SDSPT2", "SDSPT2"),
+            ("MRMP2", "MRMP2"),
+            ("OVBMP2", "OVBMP2"),
+            ("MRCISD", "MRCISD"),
+            ("MRCISDT", "MRCISDT"),
+            ("MCPDFT", "MCPDFT"),
+            ("DFTCI", "DFTCI"),
+            ("FICMRCCSD", "FICMRCCSD"),
+            ("BCCC2b", "BCCC2b"),
+            ("BCCC3b", "BCCC3b"),
         ]
 
     def generate_gjf(self, sections: Dict, options: Dict) -> str:
@@ -24,12 +38,11 @@ class GJFGenerator:
 
         # Update method if specified
         if options.get("method"):
-            route = re.sub(r"#\w+", f"#{options['method']}", route)
+            route = self._update_route_method(route, options["method"])
 
         # Update basis set if specified
         if options.get("basis_set"):
-            if "/" + options["basis_set"] not in route:
-                route = re.sub(r"/(\S+)", f"/{options['basis_set']}", route, count=1)
+            route = self._update_route_basis(route, options["basis_set"])
 
         # Add directives
         route_lines = route.split("\n")
@@ -128,6 +141,33 @@ class GJFGenerator:
                 options[item] = True
 
         return options
+
+    @staticmethod
+    def _update_route_method(route: str, method: str) -> str:
+        if not method:
+            return route
+
+        def _replace_method(match: re.Match) -> str:
+            prefix = match.group(1)
+            suffix = match.group(3) or ""
+            if "(" in method:
+                return f"{prefix}{method}"
+            return f"{prefix}{method}{suffix}"
+
+        return re.sub(
+            r"(?i)(#\s*p?\s+)([A-Za-z0-9-]+)(\([^)]*\))?",
+            _replace_method,
+            route,
+            count=1,
+        )
+
+    @staticmethod
+    def _update_route_basis(route: str, basis_set: str) -> str:
+        if not basis_set:
+            return route
+        if "/" + basis_set in route:
+            return route
+        return re.sub(r"/(\S+)", f"/{basis_set}", route, count=1)
 
     def get_methods(self):
         """Get available methods"""

@@ -36,7 +36,11 @@ import mokit_tui.screens as screens  # type: ignore
 from mokit_tui.screens import OutputScreen, SettingsScreen
 from mokit_tui.css import CSS
 
-from mokit_tui.workflow import populate_fch_files, prepare_next_step
+from mokit_tui.workflow import (
+    _build_next_step_content,
+    populate_fch_files,
+    prepare_next_step,
+)
 
 
 def parse_cli_args(args=None):
@@ -85,8 +89,8 @@ class MTUI(App):
         self.preview_margin = 5
 
         self.options = {
-            "method": "b3lyp",
-            "basis_set": "6-31g(d)",
+            "method": "",
+            "basis_set": "",
             "memory": "2GB",
             "processors": 4,
             "checkpoint": "input.chk",
@@ -96,6 +100,7 @@ class MTUI(App):
             "additional_mokit_options": "",
             "blocked_warnings": ["gvb_sort_pairs"],
         }
+        self.next_step_method = ""
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -117,6 +122,12 @@ class MTUI(App):
                             yield Input(
                                 placeholder="input_next",
                                 id="next-step-basename-input",
+                            )
+                            yield Label("method:", id="next-step-method-label")
+                            yield Select(
+                                [],
+                                id="next-step-method-select",
+                                prompt="Select method",
                             )
                         with Horizontal(id="next-step-controls"):
                             yield Label("fch file:", id="next-step-fch-label")
@@ -328,6 +339,7 @@ class MTUI(App):
 
     populate_fch_files = populate_fch_files
     prepare_next_step = prepare_next_step
+    _build_next_step_content = _build_next_step_content
 
     def load_output_if_exists(self, gjf_path: str) -> None:
         """Load corresponding .out file if it exists"""
@@ -435,6 +447,13 @@ class MTUI(App):
     def on_next_step_prepare_inline(self):
         self.prepare_next_step_inline()
 
+    @on(Select.Changed, "#next-step-method-select")
+    def on_next_step_method_changed(self, event: Select.Changed) -> None:
+        selected_method = event.value
+        if selected_method:
+            self.next_step_method = selected_method
+            self.options["method"] = selected_method
+
     def prepare_next_step_inline(self) -> None:
         self.show_next_step_container()
         name_input = self.query_one("#next-step-basename-input", Input)
@@ -443,11 +462,38 @@ class MTUI(App):
         selected_fch = fch_select.value
         if selected_fch:
             self.next_step_fch = selected_fch
+        method_select = self.query_one("#next-step-method-select", Select)
+        selected_method = method_select.value
+        if selected_method:
+            self.next_step_method = selected_method
+            self.options["method"] = selected_method
         self.prepare_next_step(selected_fch, basename)
+        try:
+            _, highlighted_content, _ = self._build_next_step_content(selected_fch)
+            name_base = basename or "next_step_preview"
+            if name_base.lower().endswith(".gjf"):
+                name_base = name_base[:-4]
+            preview_name = f"{name_base}.gjf"
+            self.update_next_step_preview(
+                f"[dim]{preview_name}[/dim]\n\n{highlighted_content}"
+            )
+        except Exception as e:
+            self.notify(
+                f"Error updating next step preview: {str(e)}",
+                severity="error",
+                timeout=0,
+            )
 
     def show_next_step_container(self) -> None:
         container = self.query_one("#next-step-container", Container)
         container.remove_class("is-hidden")
+        method_select = self.query_one("#next-step-method-select", Select)
+        options = self._get_method_options()
+        method_select.set_options(options)
+        if self.next_step_method:
+            method_select.value = self.next_step_method
+        else:
+            method_select.value = "CASSCF"
 
     def update_fch_select(self) -> None:
         fch_select = self.query_one("#next-step-fch-select", Select)
@@ -455,6 +501,9 @@ class MTUI(App):
         fch_select.set_options(options)
         if options:
             fch_select.value = options[0][1]
+
+    def _get_method_options(self) -> list[tuple[str, str]]:
+        return self.generator.get_methods()
 
     def _get_fch_options(self) -> list[tuple[str, str]]:
         search_dirs = {Path(".")}

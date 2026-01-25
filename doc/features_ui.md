@@ -14,9 +14,10 @@
 
 ## Next Step Controls
 
-- Inline box under the input preview with selector(s) and buttons only.
+- Inline box under the input preview with selectors and buttons.
 - Hidden by default and shown after pressing Next Step or Prepare.
 - The generated Next Step input is shown in the Next Step tab, not in the box.
+- Includes basename, method selector (default CASSCF), and fch file selection.
 
 ## Key Binds
 

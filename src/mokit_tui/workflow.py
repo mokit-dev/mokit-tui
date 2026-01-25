@@ -5,121 +5,133 @@ from pathlib import Path
 from textual.widgets import Select
 
 
+def _build_next_step_content(
+    self, selected_fch: str | None = None
+) -> tuple[str, str, str | None]:
+    base_dir = Path(self.template_path).parent if self.template_path else Path(".")
+    readno_value = None
+    if selected_fch:
+        selected_path = Path(selected_fch)
+        if selected_path.is_absolute():
+            resolved_fch = selected_path.resolve()
+        else:
+            resolved_fch = (base_dir / selected_path).resolve()
+        relpath = os.path.relpath(resolved_fch, base_dir.resolve())
+        readno_value = f'"{relpath}"'
+
+    original_mem = None
+    original_nprocshared = None
+    original_nproc = None
+    for line in self.template_text.splitlines():
+        stripped = line.strip()
+        lower = stripped.lower()
+        if lower.startswith("%mem=") and original_mem is None:
+            original_mem = stripped
+        elif lower.startswith("%nprocshared=") and original_nprocshared is None:
+            original_nprocshared = stripped
+        elif lower.startswith("%nproc=") and original_nproc is None:
+            original_nproc = stripped
+
+    current_content = self.generate_input()
+
+    lines = current_content.split("\n")
+    modified_lines = []
+
+    for line in lines:
+        if "mokit{" in line:
+            if selected_fch is None:
+                modified_lines.append(line)
+                continue
+            if readno_value is None:
+                modified_lines.append(line)
+                continue
+            if "}" in line:
+                if "readno=" in line:
+                    line = re.sub(
+                        r"readno\s*=\s*[^,}]+",
+                        f"readno={readno_value}",
+                        line,
+                    )
+                else:
+                    line = line.replace("}", f", readno={readno_value}}}")
+
+                if "ist=" in line:
+                    line = re.sub(r"ist\s*=\s*[^,}]+", "ist=5", line)
+                else:
+                    line = line.replace("}", ", ist=5}")
+            else:
+                if "readno=" in line:
+                    line = re.sub(
+                        r"readno\s*=\s*[^,}]+",
+                        f"readno={readno_value}",
+                        line,
+                    )
+                else:
+                    line = f"{line}, readno={readno_value}"
+
+                if "ist=" in line:
+                    line = re.sub(r"ist\s*=\s*[^,}]+", "ist=5", line)
+                else:
+                    line = f"{line}, ist=5"
+        modified_lines.append(line)
+
+    cleaned_lines = []
+    for line in modified_lines:
+        stripped = line.strip()
+        lower = stripped.lower()
+        if lower.startswith("%chk="):
+            continue
+        if original_mem and lower.startswith("%mem="):
+            continue
+        if (original_nprocshared or original_nproc) and (
+            lower.startswith("%nprocshared=") or lower.startswith("%nproc=")
+        ):
+            continue
+        cleaned_lines.append(line)
+
+    insert_directives = []
+    if original_mem:
+        insert_directives.append(original_mem)
+    if original_nprocshared:
+        insert_directives.append(original_nprocshared)
+    elif original_nproc:
+        insert_directives.append(original_nproc)
+
+    if insert_directives:
+        insert_at = 0
+        while insert_at < len(cleaned_lines) and cleaned_lines[
+            insert_at
+        ].lstrip().startswith("%"):
+            insert_at += 1
+        cleaned_lines = (
+            cleaned_lines[:insert_at] + insert_directives + cleaned_lines[insert_at:]
+        )
+    new_content = "\n".join(cleaned_lines)
+
+    highlighted_lines = []
+    for line in new_content.split("\n"):
+        if "readno=" in line:
+            highlighted_lines.append(f"[bold green]{line}[/bold green]")
+        elif "mokit{" in line:
+            highlighted_lines.append(f"[bold cyan]{line}[/bold cyan]")
+        else:
+            highlighted_lines.append(line)
+
+    highlighted_content = "\n".join(highlighted_lines)
+    return new_content, highlighted_content, readno_value
+
+
 # Update prepare_next_step() method to use selected fch file:
 def prepare_next_step(
     self, selected_fch: str | None = None, basename: str | None = None
 ) -> None:
     """Prepare input for next calculation step"""
     try:
-        if selected_fch is None:
-            selected_fch = None
-
         base_dir = Path(self.template_path).parent if self.template_path else Path(".")
-        readno_value = None
-        if selected_fch:
-            selected_path = Path(selected_fch)
-            if selected_path.is_absolute():
-                resolved_fch = selected_path.resolve()
-            else:
-                resolved_fch = (base_dir / selected_path).resolve()
-            relpath = os.path.relpath(resolved_fch, base_dir.resolve())
-            readno_value = f'"{relpath}"'
+        new_content, highlighted_content, readno_value = self._build_next_step_content(
+            selected_fch
+        )
 
-        original_mem = None
-        original_nprocshared = None
-        original_nproc = None
-        for line in self.template_text.splitlines():
-            stripped = line.strip()
-            lower = stripped.lower()
-            if lower.startswith("%mem=") and original_mem is None:
-                original_mem = stripped
-            elif lower.startswith("%nprocshared=") and original_nprocshared is None:
-                original_nprocshared = stripped
-            elif lower.startswith("%nproc=") and original_nproc is None:
-                original_nproc = stripped
-
-        # 1. Generate current input
-        current_content = self.generate_input()
-
-        # 2. Create modified content with readno option
-        lines = current_content.split("\n")
-        modified_lines = []
-
-        for line in lines:
-            if "mokit{" in line:
-                # Add readno=selected_fch to mokit options
-                if selected_fch is None:
-                    modified_lines.append(line)
-                    continue
-                if readno_value is None:
-                    modified_lines.append(line)
-                    continue
-                if "}" in line:
-                    if "readno=" in line:
-                        line = re.sub(
-                            r"readno\s*=\s*[^,}]+",
-                            f"readno={readno_value}",
-                            line,
-                        )
-                    else:
-                        line = line.replace("}", f", readno={readno_value}}}")
-
-                    if "ist=" in line:
-                        line = re.sub(r"ist\s*=\s*[^,}]+", "ist=5", line)
-                    else:
-                        line = line.replace("}", ", ist=5}")
-                else:
-                    if "readno=" in line:
-                        line = re.sub(
-                            r"readno\s*=\s*[^,}]+",
-                            f"readno={readno_value}",
-                            line,
-                        )
-                    else:
-                        line = f"{line}, readno={readno_value}"
-
-                    if "ist=" in line:
-                        line = re.sub(r"ist\s*=\s*[^,}]+", "ist=5", line)
-                    else:
-                        line = f"{line}, ist=5"
-            modified_lines.append(line)
-
-        cleaned_lines = []
-        for line in modified_lines:
-            stripped = line.strip()
-            lower = stripped.lower()
-            if lower.startswith("%chk="):
-                continue
-            if original_mem and lower.startswith("%mem="):
-                continue
-            if (original_nprocshared or original_nproc) and (
-                lower.startswith("%nprocshared=") or lower.startswith("%nproc=")
-            ):
-                continue
-            cleaned_lines.append(line)
-
-        insert_directives = []
-        if original_mem:
-            insert_directives.append(original_mem)
-        if original_nprocshared:
-            insert_directives.append(original_nprocshared)
-        elif original_nproc:
-            insert_directives.append(original_nproc)
-
-        if insert_directives:
-            insert_at = 0
-            while insert_at < len(cleaned_lines) and cleaned_lines[
-                insert_at
-            ].lstrip().startswith("%"):
-                insert_at += 1
-            cleaned_lines = (
-                cleaned_lines[:insert_at]
-                + insert_directives
-                + cleaned_lines[insert_at:]
-            )
-        new_content = "\n".join(cleaned_lines)
-
-        # 3. Save to new file with timestamp
         from datetime import datetime
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -134,17 +146,6 @@ def prepare_next_step(
         with open(new_path, "w") as f:
             f.write(new_content)
 
-        # 4. Show in preview box with highlighting
-        highlighted_lines = []
-        for line in new_content.split("\n"):
-            if "readno=" in line:
-                highlighted_lines.append(f"[bold green]{line}[/bold green]")
-            elif "mokit{" in line:
-                highlighted_lines.append(f"[bold cyan]{line}[/bold cyan]")
-            else:
-                highlighted_lines.append(line)
-
-        highlighted_content = "\n".join(highlighted_lines)
         self.update_next_step_preview(
             f"[dim]{new_filename}[/dim]\n\n{highlighted_content}"
         )
