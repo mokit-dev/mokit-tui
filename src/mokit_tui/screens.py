@@ -37,7 +37,7 @@ class OutputScreen(ModalScreen):
 
     def __init__(self, output: str, title: str = "Output"):
         super().__init__()
-        self.output = output
+        self.output = output or ""
         self.title = title
 
     def compose(self):
@@ -175,10 +175,12 @@ class UISettingsScreen(ModalScreen):
     def on_apply(self):
         preview_mode = self.query_one("#preview-mode-select", Select).value
         preview_margin = self.query_one("#preview-margin-input", Input).value
-        self.dismiss({
-            "preview_mode": preview_mode,
-            "preview_margin": preview_margin,
-        })
+        self.dismiss(
+            {
+                "preview_mode": preview_mode,
+                "preview_margin": preview_margin,
+            }
+        )
 
     @on(Button.Pressed, "#cancel-btn")
     def on_cancel(self):
@@ -195,33 +197,19 @@ class UISettingsScreen(ModalScreen):
 class NextStepScreen(ModalScreen):
     """Screen for prepare next step - simplified overlay"""
 
-    def compose(self):
-        # Get fch files
-        fch_files = list(Path(".").glob("*.fch"))
-        fch_options = (
-            [(f.name, f.name) for f in fch_files] if fch_files else [("No files", "")]
-        )
+    def __init__(self, fch_options=None):
+        super().__init__()
+        self.fch_options = fch_options or []
+        self.selected_fch = None
 
-        yield Container(
-            Static("Prepare Next Step"),
-            Horizontal(
-                Label("fch File:"),
-                Select(fch_options, id="fch-select", prompt="Select file"),
-                Button("Prepare", variant="primary", id="prepare-btn"),
-            ),
-            Horizontal(
-                Button("Apply", variant="primary", id="apply-btn"),
-                Button("Cancel", id="cancel-btn"),
-            ),
-            id="next-step-dialog",
-        )
+    def compose(self):
         yield Container(
             Static("📝 [b]Prepare Next Step[/b]", classes="dialog-title"),
             Container(
                 Horizontal(
                     Label("fch File:", classes="label"),
                     Select(
-                        [],
+                        self.fch_options,
                         id="fch-select",
                         prompt="Select .fch file",
                         classes="fch-select",
@@ -238,16 +226,26 @@ class NextStepScreen(ModalScreen):
             id="next-step-dialog",
         )
 
+    def on_mount(self):
+        fch_select = self.query_one("#fch-select", Select)
+        fch_select.set_options(self.fch_options)
+
+    @on(Select.Changed, "#fch-select")
+    def on_fch_changed(self, event: Select.Changed) -> None:
+        self.selected_fch = event.value
+
     @on(Button.Pressed, "#prepare-btn")
     def on_prepare(self):
         # Get selected fch file and prepare it
-        fch_file = self.query_one("#fch-select", Select).value
+        fch_select = self.query_one("#fch-select", Select)
+        fch_file = self.selected_fch or fch_select.value
         self.dismiss({"prepare": True, "fch_file": fch_file})
 
     @on(Button.Pressed, "#apply-btn")
     def on_apply(self):
         # Just apply and close
-        fch_file = self.query_one("#fch-select", Select).value
+        fch_select = self.query_one("#fch-select", Select)
+        fch_file = self.selected_fch or fch_select.value
         self.dismiss({"prepare": False, "fch_file": fch_file})
 
     @on(Button.Pressed, "#cancel-btn")

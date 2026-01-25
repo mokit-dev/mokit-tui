@@ -14,6 +14,16 @@ class InputPreview(Static):
         self.update(f"[b]MOKIT Input Preview:[/b]\n\n{content}")
 
 
+class NextStepPreview(Static):
+    """Widget to display next step input content"""
+
+    content = reactive("[dim]No next step prepared[/dim]")  # type: ignore[assignment]
+
+    def watch_content(self, content: str) -> None:
+        """Update display when content changes"""
+        self.update(f"[b]Next Step Input Preview:[/b]\n\n{content}")
+
+
 class TemplateInfo(Static):
     """Display template information"""
 

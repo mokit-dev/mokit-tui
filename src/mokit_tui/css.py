@@ -17,15 +17,16 @@ CSS = """
         margin: 1 0;
     }
     
-    #preview-box, #output-preview {
+    #input-preview-tabs, #output-preview {
         height: 100%;
         width: 1fr;
         padding: 1;
         background: $surface;
     }
-    
-    #preview-box {
+
+    #input-preview-tabs {
         border-right: solid $primary;
+        height: 100%;
     }
     
     #output-preview {

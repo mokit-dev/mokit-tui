@@ -1,6 +1,6 @@
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
-from textual.widgets import Header, Footer, Button
+from textual.widgets import Header, Footer, Button, TabbedContent, TabPane
 from textual import on
 import subprocess
 import sys
@@ -16,19 +16,22 @@ if __package__ is None:
 from mokit_tui.parser import GJFParser, OutputParser
 import mokit_tui.parser as parser
 from mokit_tui.gen import GJFGenerator
-from mokit_tui.widgets import InputPreview, TemplateInfo, OutputPreview
+from mokit_tui.widgets import (
+    InputPreview,
+    OutputPreview,
+    TemplateInfo,
+)
+from mokit_tui.widgets import NextStepPreview  # type: ignore[attr-defined]
 import mokit_tui.screens as screens  # type: ignore
 from mokit_tui.screens import OutputScreen, SettingsScreen, NextStepScreen
 from mokit_tui.css import CSS
 
-from mokit_tui.workflow import *
+from mokit_tui.workflow import *  # type: ignore
 
 
 def parse_cli_args(args=None):
     """Parse command-line arguments for debugging options"""
-    parser = argparse.ArgumentParser(
-        description="MOKIT TUI"
-    )
+    parser = argparse.ArgumentParser(description="MOKIT TUI")
     parser.add_argument("template_file", help="Template GJF file to load")
     parser.add_argument(
         "-s",
@@ -60,6 +63,8 @@ class MTUI(App):
         self.input_file = "input.gjf"
         self.template_sections = {}
         self.template_path = None
+        self.template_text = ""
+        self.next_step_preview_content = "[dim]No next step prepared[/dim]"
         self.parser = GJFParser()
         self.output_parser = OutputParser()
         self.generator = GJFGenerator()
@@ -89,7 +94,11 @@ class MTUI(App):
         with Container(id="main-container"):
             yield TemplateInfo(id="template-info")
             with Container(id="preview-container"):
-                yield InputPreview(id="preview-box")
+                with TabbedContent(id="input-preview-tabs"):
+                    with TabPane("Input", id="input-preview-tab"):
+                        yield InputPreview(id="preview-box")
+                    with TabPane("Next Step", id="next-step-preview-tab"):
+                        yield NextStepPreview(id="next-step-preview")
                 yield OutputPreview(id="output-preview")
 
             with Horizontal(id="buttons"):
@@ -111,13 +120,15 @@ class MTUI(App):
     def update_template_info(self, message: str) -> None:
         """Update template information display"""
         info_widget = self.query_one("#template-info", TemplateInfo)
-        info_widget.info = message
+        info_widget.info = message  # type: ignore[attr-defined]
 
     def load_template(self, filepath: str) -> None:
         """Load a template gjf file"""
         try:
             self.template_sections = self.parser.parse_gjf(filepath)
             self.template_path = filepath
+            with open(filepath, "r") as f:
+                self.template_text = f.read()
 
             # Always set title to mokit{}
             self.template_sections["title"] = "mokit{}"
@@ -177,8 +188,14 @@ class MTUI(App):
 
     def update_preview(self) -> None:
         """Update preview box"""
-        preview = self.query_one(InputPreview)
-        preview.content = self.generate_input()
+        preview = self.query_one("#preview-box", InputPreview)
+        preview.content = self.template_text or ""  # type: ignore[attr-defined]
+
+    def update_next_step_preview(self, content: str) -> None:
+        """Update next step preview tab"""
+        self.next_step_preview_content = content
+        preview = self.query_one("#next-step-preview", NextStepPreview)
+        preview.content = content  # type: ignore[attr-defined]
 
     def save_input_file(self) -> None:
         """Save to input.gjf"""
@@ -268,11 +285,15 @@ class MTUI(App):
 
     def _do_auto_open_next_step(self) -> None:
         """Internal method to open next step modal with delay"""
-        next_step_screen = NextStepScreen()
+        fch_options = self._get_fch_options()
+        next_step_screen = NextStepScreen(fch_options=fch_options)  # type: ignore[call-arg]
 
         async def handle_next_step_result(result):
             if result and result.get("prepare"):
-                self.prepare_next_step_with_fch(result.get("fch_file"))
+                selected_fch = result.get("fch_file")
+                if selected_fch:
+                    self.next_step_fch = selected_fch
+                self.prepare_next_step(selected_fch)
             self.notify_persistent("Auto-next-step completed", severity="information")
 
         self.push_screen(next_step_screen, handle_next_step_result)
@@ -291,6 +312,7 @@ class MTUI(App):
             self.call_after_refresh(self.auto_open_next_step)
 
     populate_fch_files = populate_fch_files
+    prepare_next_step = prepare_next_step
 
     def load_output_if_exists(self, gjf_path: str) -> None:
         """Load corresponding .out file if it exists"""
@@ -392,13 +414,34 @@ class MTUI(App):
 
     @on(Button.Pressed, "#next-step-btn")
     def on_next_step_button(self):
-        next_step_screen = NextStepScreen()
+        fch_options = self._get_fch_options()
+        next_step_screen = NextStepScreen(fch_options=fch_options)  # type: ignore[call-arg]
 
         async def handle_next_step_result(result):
             if result and result.get("prepare"):
-                self.prepare_next_step_with_fch(result.get("fch_file"))
+                selected_fch = result.get("fch_file")
+                if selected_fch:
+                    self.next_step_fch = selected_fch
+                self.prepare_next_step(selected_fch)
 
         self.push_screen(next_step_screen, handle_next_step_result)
+
+    def _get_fch_options(self) -> list[tuple[str, str]]:
+        search_dirs = {Path(".")}
+        if self.template_path:
+            search_dirs.add(Path(self.template_path).parent)
+        fch_files = set()
+        for directory in search_dirs:
+            fch_files.update(directory.rglob("*.fch"))
+            fch_files.update(directory.rglob("*.FCH"))
+        options = []
+        for fch_file in sorted({path.resolve() for path in fch_files}):
+            try:
+                label = str(fch_file.relative_to(Path(".").resolve()))
+            except ValueError:
+                label = fch_file.name
+            options.append((label, label))
+        return options
 
     @on(Button.Pressed, "#run-btn")
     def on_run_button(self):

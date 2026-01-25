@@ -4,12 +4,11 @@ from pathlib import Path
 
 
 # Update prepare_next_step() method to use selected fch file:
-def prepare_next_step(self) -> None:
+def prepare_next_step(self, selected_fch: str | None = None) -> None:
     """Prepare input for next calculation step"""
     try:
-        # Get selected fch file
-        fch_select = self.query_one("#fch-select", Select)
-        selected_fch = fch_select.value if fch_select.value else "default.fch"
+        if selected_fch is None:
+            selected_fch = None
 
         # 1. Generate current input
         current_content = self.generate_input()
@@ -21,6 +20,9 @@ def prepare_next_step(self) -> None:
         for line in lines:
             if "mokit{" in line:
                 # Add readno=selected_fch to mokit options
+                if selected_fch is None:
+                    modified_lines.append(line)
+                    continue
                 if "}" in line:
                     # Check if readno already exists
                     if "readno=" in line:
@@ -47,7 +49,6 @@ def prepare_next_step(self) -> None:
             f.write(new_content)
 
         # 4. Show in preview box with highlighting
-        preview = self.query_one(InputPreview)
         highlighted_lines = []
         for line in new_content.split("\n"):
             if "readno=" in line:
@@ -58,12 +59,13 @@ def prepare_next_step(self) -> None:
                 highlighted_lines.append(line)
 
         highlighted_content = "\n".join(highlighted_lines)
-        preview.content = (
-            f"[b]Next Step Input Preview ({new_filename}):[/b]\n\n{highlighted_content}"
+        self.update_next_step_preview(
+            f"[dim]{new_filename}[/dim]\n\n{highlighted_content}"
         )
 
+        fch_note = f"\nUsing fch: {selected_fch}" if selected_fch else ""
         self.notify(
-            f"Next step prepared: {new_filename}\nUsing fch: {selected_fch}",
+            f"Next step prepared: {new_filename}{fch_note}",
             severity="success",
             timeout=0,
         )

@@ -140,8 +140,8 @@ except Exception as e:
 
 ### Type Checking Notes
 - pyright is configured for "basic" mode in pyrightconfig.json
-- Some type issues exist with Textual's severity enum - use `# type: ignore` comments where needed
 - Focus on type hints for public APIs and critical paths
+- Do not over-optimize typing; accept type checker warnings when it keeps changes simpler
 
 ### Code Patterns to Follow
 - Use `Path(filepath).name` for filename extraction

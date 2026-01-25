@@ -4,7 +4,7 @@ __version__ = "0.1.0"
 
 from .parser import GJFParser
 from .gen import GJFGenerator
-from .widgets import InputPreview, TemplateInfo
+from .widgets import InputPreview, TemplateInfo, NextStepPreview
 from .screens import FileLoadScreen, OutputScreen
 from .main import MTUI, main
 
@@ -12,6 +12,7 @@ __all__ = [
     "GJFParser",
     "GJFGenerator",
     "InputPreview",
+    "NextStepPreview",
     "TemplateInfo",
     "FileLoadScreen",
     "OutputScreen",
