@@ -1,12 +1,29 @@
+import os
+import re
 from pathlib import Path
+
+from textual.widgets import Select
 
 
 # Update prepare_next_step() method to use selected fch file:
-def prepare_next_step(self, selected_fch: str | None = None) -> None:
+def prepare_next_step(
+    self, selected_fch: str | None = None, basename: str | None = None
+) -> None:
     """Prepare input for next calculation step"""
     try:
         if selected_fch is None:
             selected_fch = None
+
+        base_dir = Path(self.template_path).parent if self.template_path else Path(".")
+        readno_value = None
+        if selected_fch:
+            selected_path = Path(selected_fch)
+            if selected_path.is_absolute():
+                resolved_fch = selected_path.resolve()
+            else:
+                resolved_fch = (base_dir / selected_path).resolve()
+            relpath = os.path.relpath(resolved_fch, base_dir.resolve())
+            readno_value = f'"{relpath}"'
 
         original_mem = None
         original_nprocshared = None
@@ -34,18 +51,37 @@ def prepare_next_step(self, selected_fch: str | None = None) -> None:
                 if selected_fch is None:
                     modified_lines.append(line)
                     continue
+                if readno_value is None:
+                    modified_lines.append(line)
+                    continue
                 if "}" in line:
-                    # Check if readno already exists
                     if "readno=" in line:
-                        # Replace existing readno
-                        import re
-
-                        line = re.sub(r"readno=[^,}]+", f"readno={selected_fch}", line)
+                        line = re.sub(
+                            r"readno\s*=\s*[^,}]+",
+                            f"readno={readno_value}",
+                            line,
+                        )
                     else:
-                        # Add new readno before closing }
-                        line = line.replace("}", f", readno={selected_fch}}}")
+                        line = line.replace("}", f", readno={readno_value}}}")
+
+                    if "ist=" in line:
+                        line = re.sub(r"ist\s*=\s*[^,}]+", "ist=5", line)
+                    else:
+                        line = line.replace("}", ", ist=5}")
                 else:
-                    line = f"{line}, readno={selected_fch}"
+                    if "readno=" in line:
+                        line = re.sub(
+                            r"readno\s*=\s*[^,}]+",
+                            f"readno={readno_value}",
+                            line,
+                        )
+                    else:
+                        line = f"{line}, readno={readno_value}"
+
+                    if "ist=" in line:
+                        line = re.sub(r"ist\s*=\s*[^,}]+", "ist=5", line)
+                    else:
+                        line = f"{line}, ist=5"
             modified_lines.append(line)
 
         cleaned_lines = []
@@ -87,9 +123,15 @@ def prepare_next_step(self, selected_fch: str | None = None) -> None:
         from datetime import datetime
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        new_filename = f"input_next_{timestamp}.gjf"
+        name_base = (basename or "").strip()
+        if not name_base:
+            name_base = f"input_next_{timestamp}"
+        if name_base.lower().endswith(".gjf"):
+            name_base = name_base[:-4]
+        new_filename = f"{name_base}.gjf"
+        new_path = base_dir / new_filename
 
-        with open(new_filename, "w") as f:
+        with open(new_path, "w") as f:
             f.write(new_content)
 
         # 4. Show in preview box with highlighting
@@ -107,7 +149,7 @@ def prepare_next_step(self, selected_fch: str | None = None) -> None:
             f"[dim]{new_filename}[/dim]\n\n{highlighted_content}"
         )
 
-        fch_note = f"\nUsing fch: {selected_fch}" if selected_fch else ""
+        fch_note = f"\nUsing fch: {readno_value}" if readno_value else ""
         self.notify(
             f"Next step prepared: {new_filename}{fch_note}",
             severity="success",

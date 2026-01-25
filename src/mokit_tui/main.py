@@ -5,6 +5,7 @@ from textual.widgets import (
     Header,
     Footer,
     Button,
+    Input,
     Label,
     Select,
     TabbedContent,
@@ -111,6 +112,12 @@ class MTUI(App):
                             yield NextStepPreview(id="next-step-tab-preview")
                     with Container(id="next-step-container", classes="is-hidden"):
                         yield Static("[b]Next Step[/b]", id="next-step-title")
+                        with Horizontal(id="next-step-name-row"):
+                            yield Label("basename:", id="next-step-name-label")
+                            yield Input(
+                                placeholder="input_next",
+                                id="next-step-basename-input",
+                            )
                         with Horizontal(id="next-step-controls"):
                             yield Label("fch file:", id="next-step-fch-label")
                             yield Select([], id="next-step-fch-select")
@@ -430,11 +437,13 @@ class MTUI(App):
 
     def prepare_next_step_inline(self) -> None:
         self.show_next_step_container()
+        name_input = self.query_one("#next-step-basename-input", Input)
+        basename = name_input.value.strip()
         fch_select = self.query_one("#next-step-fch-select", Select)
         selected_fch = fch_select.value
         if selected_fch:
             self.next_step_fch = selected_fch
-        self.prepare_next_step(selected_fch)
+        self.prepare_next_step(selected_fch, basename)
 
     def show_next_step_container(self) -> None:
         container = self.query_one("#next-step-container", Container)

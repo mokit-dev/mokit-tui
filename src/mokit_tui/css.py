@@ -55,7 +55,17 @@ CSS = """
     }
 
     #next-step-controls {
-        margin-top: 1;
+        margin-top: 0;
+        padding: 1 0;
+    }
+
+    #next-step-name-row {
+        margin-top: 0;
+    }
+
+    #next-step-basename-input,
+    #next-step-fch-select {
+        width: 1fr;
     }
 
     #next-step-preview {
@@ -119,6 +129,8 @@ CSS = """
         margin: 0 1;
         padding: 0 1;
     }
+
+
     
     Select:hover, Input:hover {
         background: $surface;
