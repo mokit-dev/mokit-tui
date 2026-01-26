@@ -33,6 +33,60 @@ class FileLoadScreen(ModalScreen):
         self.dismiss(None)
 
 
+class SaveScreen(ModalScreen):
+    """Screen for save options"""
+
+    def __init__(self, current_file: str, tab_label: str):
+        super().__init__()
+        self.current_file = current_file
+        self.tab_label = tab_label
+
+    def on_mount(self):
+        self.add_class("dialog-overlay")
+
+    def compose(self):
+        yield Container(
+            Static("Save Input", classes="dialog-title"),
+            Static(f"Active tab: {self.tab_label}"),
+            Horizontal(
+                Label("Overwrite:"),
+                Static(
+                    f"{self.current_file if self.current_file else 'None'}",
+                    id="save-current-file",
+                ),
+                Button("Overwrite", variant="primary", id="overwrite-btn"),
+                classes="save-row save-row-overwrite",
+            ),
+            Horizontal(
+                Label("Save As:"),
+                Input(placeholder="new_name.gjf", id="save-as-input"),
+                Button("Save As", id="save-as-btn"),
+                classes="save-row",
+            ),
+            Horizontal(
+                Button("Cancel", id="cancel-btn"),
+                classes="save-row",
+            ),
+            id="save-dialog",
+        )
+
+    @on(Button.Pressed, "#overwrite-btn")
+    def on_overwrite(self):
+        self.dismiss({"action": "overwrite"})
+
+    @on(Button.Pressed, "#save-as-btn")
+    def on_save_as(self):
+        filepath = self.query_one("#save-as-input", Input).value.strip()
+        if not filepath:
+            self.notify("Enter a filename", severity="warning")
+            return
+        self.dismiss({"action": "save_as", "path": filepath})
+
+    @on(Button.Pressed, "#cancel-btn")
+    def on_cancel(self):
+        self.dismiss(None)
+
+
 class OutputScreen(ModalScreen):
     """Screen to display command output - simplified"""
 
@@ -65,7 +119,7 @@ class SettingsScreen(ModalScreen):
 
     def compose(self):
         yield Container(
-            Static("Calculation Settings"),
+            Static("Calculation Settings", classes="dialog-title"),
             Horizontal(
                 Label("Basis:"),
                 Input(
@@ -121,8 +175,7 @@ class SettingsScreen(ModalScreen):
         self.dismiss(None)
 
     def on_mount(self):
-        """No-op mount hook for settings screen"""
-        return
+        self.add_class("dialog-overlay")
 
 
 class UISettingsScreen(ModalScreen):
@@ -140,7 +193,7 @@ class UISettingsScreen(ModalScreen):
         ]
 
         yield Container(
-            Static("UI Settings"),
+            Static("UI Settings", classes="dialog-title"),
             Horizontal(
                 Label("fch preview mode:"),
                 Select(preview_options, id="preview-mode-select"),
@@ -177,6 +230,7 @@ class UISettingsScreen(ModalScreen):
 
     def on_mount(self):
         """Set initial preview mode value"""
+        self.add_class("dialog-overlay")
         preview_select = self.query_one("#preview-mode-select", Select)
         preview_select.value = self.preview_mode
         preview_input = self.query_one("#preview-margin-input", Input)

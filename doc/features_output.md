@@ -4,6 +4,7 @@
 
 - Parses output logs for warnings, programs used, and energies.
 - Displays results in the output preview panel.
+- Output file search order: `xxx.gjf.out`, then `xxx.out`.
 
 ## fch Preview
 

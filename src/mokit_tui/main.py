@@ -33,7 +33,7 @@ from mokit_tui.widgets import (
 )
 from mokit_tui.widgets import NextStepPreview  # type: ignore[attr-defined]
 import mokit_tui.screens as screens  # type: ignore
-from mokit_tui.screens import OutputScreen, SettingsScreen
+from mokit_tui.screens import OutputScreen, SaveScreen, SettingsScreen
 from mokit_tui.css import CSS
 
 from mokit_tui.workflow import (
@@ -51,13 +51,13 @@ def parse_cli_args(args=None):
         "-s",
         "--auto-settings",
         action="store_true",
-        help="Auto-open settings modal on startup",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "-n",
         "--auto-next-step",
         action="store_true",
-        help="Auto-open next step modal on startup",
+        help=argparse.SUPPRESS,
     )
     if args is None:
         return parser.parse_args()
@@ -74,11 +74,13 @@ class MTUI(App):
         super().__init__()
         self.cli_args = cli_args
         self.template_file = None
-        self.input_file = "input.gjf"
+        self.input_file = ""
         self.template_sections = {}
         self.template_path = None
         self.template_text = ""
         self.next_step_preview_content = "[dim]No next step prepared[/dim]"
+        self.next_step_path = None
+        self.next_step_content = ""
         self.parser = GJFParser()
         self.output_parser = OutputParser()
         self.generator = GJFGenerator()
@@ -141,7 +143,7 @@ class MTUI(App):
                 yield Button("Settings", variant="default", id="settings-btn")
                 yield Button("UI Settings", variant="default", id="ui-settings-btn")
                 yield Button("Next Step (n)", variant="default", id="next-step-btn")
-                yield Button("Run", variant="default", id="run-btn")
+                yield Button("Run (r)", variant="default", id="run-btn")
                 yield Button("Save (s)", variant="default", id="save-btn")
                 yield Button("Exit (q)", variant="error", id="exit-btn")
 
@@ -165,6 +167,7 @@ class MTUI(App):
         try:
             self.template_sections = self.parser.parse_gjf(filepath)
             self.template_path = filepath
+            self.input_file = filepath
             with open(filepath, "r") as f:
                 self.template_text = f.read()
 
@@ -238,38 +241,86 @@ class MTUI(App):
 
     def save_input_file(self) -> None:
         """Save to input.gjf"""
+        if not self.input_file:
+            self.notify_persistent("No input file loaded", severity="warning")
+            return
+        self.save_input_file_to(self.input_file)
+
+    def save_input_file_to(self, filepath: str) -> None:
+        """Save to specified gjf file"""
         content = self.generate_input()
-        with open(self.input_file, "w") as f:
+        self.save_content_to(content, filepath)
+
+    def save_content_to(self, content: str, filepath: str) -> None:
+        """Save specified content to file"""
+        with open(filepath, "w") as f:
             f.write(content)
 
-        file_size = Path(self.input_file).stat().st_size
+        file_size = Path(filepath).stat().st_size
         self.notify_persistent(
-            f"Saved to {self.input_file} ({file_size} bytes)", severity="information"
+            f"Saved to {filepath} ({file_size} bytes)", severity="information"
         )
+
+    def _get_active_tab(self) -> str:
+        tabbed = self.query_one("#input-preview-tabs", TabbedContent)
+        return tabbed.active
+
+    def _get_run_target(self) -> tuple[str, str] | None:
+        active_tab = self._get_active_tab()
+        if active_tab == "next-step-preview-tab":
+            if self.next_step_path and Path(self.next_step_path).exists():
+                return self.next_step_path, "next step"
+            self.notify_persistent("No next step file prepared", severity="warning")
+            return None
+
+        if self.input_file and Path(self.input_file).exists():
+            return self.input_file, "template"
+
+        self.notify_persistent("No template loaded", severity="warning")
+        return None
 
     def run_calculation(self) -> None:
         """Run backend program"""
-        self.save_input_file()
+        run_target = self._get_run_target()
+        if not run_target:
+            return
+
+        input_path, _ = run_target
+        output_path = f"{input_path}.out"
 
         try:
-            result = subprocess.run(
-                ["xxx", self.input_file], capture_output=True, text=True, check=True
-            )
-
-            output = result.stdout if result.stdout else "No output"
-            if result.stderr:
-                output += f"\n\nSTDERR:\n{result.stderr}"
-
-            self.app.push_screen(OutputScreen(output, title="Calculation Output"))
-
-        except subprocess.CalledProcessError as e:
-            self.app.push_screen(
-                OutputScreen(
-                    f"Error (code {e.returncode}):\n\n{e.stderr}", title="Error"
+            with open(output_path, "w") as output_file:
+                result = subprocess.run(
+                    ["automr", input_path],
+                    stdout=output_file,
+                    stderr=subprocess.STDOUT,
+                    text=True,
                 )
-            )
+
+            output_text = "No output"
+            output_file_path = Path(output_path)
+            if output_file_path.exists():
+                output_text = output_file_path.read_text() or "No output"
+
+            if result.returncode == 0:
+                self.app.push_screen(
+                    OutputScreen(
+                        output_text,
+                        title=f"Calculation Output ({Path(input_path).name})",
+                    )
+                )
+                self.load_output_if_exists(input_path)
+            else:
+                self.app.push_screen(
+                    OutputScreen(
+                        f"Error (code {result.returncode}):\n\n{output_text}",
+                        title="Error",
+                    )
+                )
         except FileNotFoundError:
-            self.notify_persistent("Backend 'xxx' not found!", severity="error")
+            self.notify_persistent("Backend 'automr' not found!", severity="error")
+        except Exception as e:
+            self.notify_persistent(f"Error running automr: {str(e)}", severity="error")
 
     def show_geometry(self) -> None:
         """Show molecular geometry"""
@@ -349,7 +400,6 @@ class MTUI(App):
             possible_outputs = [
                 str(base_path) + ".out",  # file.gjf.out
                 base_path.with_suffix(".out"),  # file.out
-                str(base_path).replace(".gjf", ".out"),  # file.out
             ]
 
             output_file = None
@@ -528,7 +578,50 @@ class MTUI(App):
 
     @on(Button.Pressed, "#save-btn")
     def on_save_button(self):
-        self.save_input_file()
+        active_tab = self._get_active_tab()
+        if active_tab == "next-step-preview-tab":
+            current_file = self.next_step_path or ""
+            tab_label = "Next Step"
+        else:
+            current_file = self.input_file
+            tab_label = "Input"
+
+        save_screen = SaveScreen(current_file, tab_label)
+
+        async def handle_save_result(result):
+            if not result:
+                return
+            action = result.get("action")
+            filepath = result.get("path")
+            if active_tab == "next-step-preview-tab":
+                if action == "overwrite":
+                    if not self.next_step_path:
+                        self.notify_persistent(
+                            "No next step file to overwrite", severity="warning"
+                        )
+                        return
+                    if not self.next_step_content:
+                        self.notify_persistent(
+                            "No next step content to save", severity="warning"
+                        )
+                        return
+                    self.save_content_to(self.next_step_content, self.next_step_path)
+                elif action == "save_as" and filepath:
+                    if not self.next_step_content:
+                        self.notify_persistent(
+                            "No next step content to save", severity="warning"
+                        )
+                        return
+                    self.save_content_to(self.next_step_content, filepath)
+                    self.next_step_path = filepath
+            else:
+                if action == "overwrite":
+                    self.save_input_file()
+                elif action == "save_as" and filepath:
+                    self.save_input_file_to(filepath)
+                    self.input_file = filepath
+
+        self.push_screen(save_screen, handle_save_result)
 
     @on(Button.Pressed, "#geom-btn")
     def on_geom_button(self):
@@ -540,7 +633,7 @@ class MTUI(App):
 
     def key_s(self) -> None:
         """s to save"""
-        self.save_input_file()
+        self.on_save_button()
 
     def key_escape(self) -> None:
         """esc to exit"""
@@ -553,6 +646,10 @@ class MTUI(App):
     def key_n(self) -> None:
         """n to prepare next step"""
         self.prepare_next_step_inline()
+
+    def key_r(self) -> None:
+        """r to run"""
+        self.run_calculation()
 
 
 def main():

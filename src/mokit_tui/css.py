@@ -3,6 +3,10 @@ CSS = """
         align: center middle;
         background: $background;
     }
+
+    Screen.dialog-overlay {
+        background: transparent;
+    }
     
     #main-container {
         width: 90%;
@@ -132,6 +136,34 @@ CSS = """
         padding: 0 1;
     }
 
+    #save-dialog .save-row {
+        margin-top: 0;
+    }
+
+    #save-dialog .save-row-overwrite {
+        margin-top: 1;
+    }
+
+    #save-dialog #save-current-file {
+        width: 1fr;
+        overflow: hidden;
+    }
+
+    #save-dialog .save-row Label {
+        width: 10;
+        margin-right: 1;
+    }
+
+    #save-dialog .save-row Input {
+        width: 1fr;
+        margin: 0 1 0 0;
+    }
+
+    #save-dialog Button {
+        min-width: 10;
+        margin: 0 1 0 0;
+    }
+
 
     
     Select:hover, Input:hover {
@@ -154,11 +186,14 @@ CSS = """
         align: left middle;
     }
     
-    #file-dialog, #output-dialog, #settings-dialog, #next-step-dialog {
+    #file-dialog, #output-dialog, #settings-dialog, #ui-settings-dialog, #next-step-dialog, #save-dialog {
         width: 50%;
-        height: 30%;
+        height: auto;
+        min-height: 12;
+        max-height: 18;
         background: $surface;
         opacity: 0.95;
+        border: solid #777777;
     }
     
     .dialog-title {

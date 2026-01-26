@@ -146,6 +146,9 @@ def prepare_next_step(
         with open(new_path, "w") as f:
             f.write(new_content)
 
+        self.next_step_path = str(new_path)
+        self.next_step_content = new_content
+
         self.update_next_step_preview(
             f"[dim]{new_filename}[/dim]\n\n{highlighted_content}"
         )
