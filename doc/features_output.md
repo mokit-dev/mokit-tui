@@ -5,6 +5,12 @@
 - Parses output logs for warnings, programs used, and energies.
 - Displays results in the output preview panel.
 - Output file search order: `xxx.gjf.out`, then `xxx.out`.
+- Supports MRSF-CIS energy sections from GAMESS output.
+- Supports SA-CAS energy sections from SA-CASSCF output.
+- Detects section headers and parses multiple state lines.
+- Backward compatible with existing single-line energy patterns.
+
+For detailed energy parsing information, see `doc/energy_parsing.md`.
 
 ## fch Preview
 

@@ -31,9 +31,20 @@ ruff check --fix    # Auto-fix fixable ruff issues
 ```
 
 ### Testing
-No formal test framework is currently configured. Test case files are located in `testcase/vn/` directory but appear to be example input files rather than unit tests.
+Comprehensive test suite is configured in `test/` directory with unit and integration tests.
 
-To run a specific test case file:
+To run all tests:
+```bash
+python test/run_tests.py
+```
+
+To run specific test files:
+```bash
+python test/test_energy_parsing.py
+python test/test_integration.py
+```
+
+Test case files for manual testing are located in `testcase/vn/` directory:
 ```bash
 python src/mokit_tui/main.py testcase/vn/filename.py
 ```
@@ -143,6 +154,7 @@ except Exception as e:
 - UI features: `doc/features_ui.md`
 - Input/IO features: `doc/features_io.md`
 - Output preview summary: `doc/features_output.md`
+- Energy parsing features: `doc/energy_parsing.md`
 - fch preview details: `doc/preview_fch.md`
 - Versioning protocol: `doc/versioning.md`
 

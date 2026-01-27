@@ -1,0 +1,11 @@
+MRSF-CIS energies from GAMESS:
+Ground State    0: E=    -38.892459 a.u.                        <S**2>=   0.000
+Excited State   1: E=    -38.822651 a.u. (  1.90 eV), f=0.0051, <S**2>=   0.000
+Excited State   2: E=    -38.695945 a.u. (  5.35 eV), f=0.0089, <S**2>=   0.000
+Excited State   3: E=    -38.657460 a.u. (  6.39 eV), f=0.0000, <S**2>=   0.000
+
+CASCI energies after SA-CASSCF(0 for ground state):   E_ex/eV   fosc
+State   0, E =    -38.90257869 a.u. <S**2> = 2.000
+State   1, E =    -38.89244580 a.u. <S**2> = 0.000    0.276   0.0000
+State   2, E =    -38.82071323 a.u. <S**2> = 0.000    2.228   0.0000
+State   3, E =    -38.71285121 a.u. <S**2> = 0.000    5.163   0.0000

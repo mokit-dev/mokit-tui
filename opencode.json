@@ -11,18 +11,59 @@
   "small_model": "openai/gpt-4o-mini",
   "permission": {
     "edit": "ask",
-    "bash": "ask"
+    "bash": {
+      "*": "ask",
+      
+      "python *": "allow",
+      "python3 *": "allow", 
+      "python -m *": "allow",
+      "ruff *": "allow",
+      "cat *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "wc *": "allow",
+      "ls *": "allow",
+      "find *": "allow",
+      "grep *": "allow",
+      "rg *": "allow",
+      "git status *": "allow",
+      "git diff *": "allow",
+      "git log *": "allow",
+      "which *": "allow",
+      "pwd *": "allow",
+      "echo *": "allow",
+      
+      "cp *": "ask",
+      "mv *": "ask", 
+      "mkdir *": "ask",
+      "chmod *": "ask",
+      "rm -rf *": "ask",
+      "git commit *": "ask",
+      "git push *": "ask",
+      "git checkout *": "ask",
+      "git branch *": "ask",
+      "git reset *": "ask",
+      "sed *": "ask",
+      "pip install *": "ask",
+      "pip uninstall *": "ask",
+      "sudo *": "deny"
+    },
+    "read": {
+      "*": "allow"
+    }
   },
   "command": {
     "test": {
-      "template": "Run the test suite and show only failing tests with their error messages.",
-      "description": "Run tests efficiently",
-      "model": "openai/gpt-4o-mini"
+      "template": "Run test suite from test/ directory and show only failing tests with their error messages. Use 'python test/run_tests.py' to run all tests or specify individual test files like 'python test/test_energy_parsing.py'.",
+      "description": "Run tests efficiently"
     },
     "lint": {
       "template": "Run linter and show only errors, not warnings. Fix any critical issues.",
-      "description": "Quick lint check",
-      "model": "openai/gpt-4o-mini"
+      "description": "Quick lint check"
+    },
+"update-doc": {
+      "template": "Update documentation files in @doc folder to reflect recent code changes. Update the AGENTS.md if needed. Ensure all documentation is current and accurate.",
+      "description": "Update project documentation"
     }
   }
 }

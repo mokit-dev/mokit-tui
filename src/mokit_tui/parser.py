@@ -175,6 +175,7 @@ class OutputParser:
         self.warnings = []
         self.programs = []
         self.energies = []
+        self._last_parsed_line = 0
 
     def parse_output_file(self, filepath: str) -> Dict:
         """Parse an output file and extract key information"""
@@ -199,7 +200,7 @@ class OutputParser:
                 warning_lines = [line]
                 start_line_num = line_num
                 end_line_num = line_num
-                
+
                 # If the warning line itself is complete, don't accumulate more
                 if not self._is_sentence_complete(line):
                     # Continue reading lines until sentence is complete
@@ -208,25 +209,34 @@ class OutputParser:
                         next_line = lines[i].strip()
                         warning_lines.append(next_line)
                         end_line_num = i + 1
-                        
+
                         if self._is_sentence_complete(next_line):
                             break
                         i += 1
-                
+
                 # Store complete warning
-                self.warnings.append({
-                    "text": " ".join(warning_lines),
-                    "start_line": start_line_num,
-                    "end_line": end_line_num
-                })
-            
+                self.warnings.append(
+                    {
+                        "text": " ".join(warning_lines),
+                        "start_line": start_line_num,
+                        "end_line": end_line_num,
+                    }
+                )
+
             # Parse program usage
             elif self._is_program_line(line):
                 self.programs.append({"line": line, "line_number": line_num})
-            
+
             # Parse energies
             elif self._is_energy_line(line):
                 self.energies.append({"line": line, "line_number": line_num})
+
+            # Parse section-based energy formats
+            elif self._is_energy_section_header(line):
+                section_type = self._get_energy_section_type(line)
+                self._parse_energy_section(lines, i, line_num, section_type)
+                # Skip ahead as lines were already processed
+                i = self._get_last_parsed_line() - 1
 
             i += 1
 
@@ -244,16 +254,16 @@ class OutputParser:
             r"^WARNING:",
             r"^UserWarning:",
         ]
-        
+
         for pattern in warning_patterns:
             if re.search(pattern, line):
                 return True
         return False
-    
+
     def _is_sentence_complete(self, line: str) -> bool:
         """Check if a line forms a complete sentence"""
         stripped = line.strip()
-        return stripped.endswith(('.', '!', '?', ':'))
+        return stripped.endswith((".", "!", "?", ":"))
 
     def _is_program_line(self, line: str) -> bool:
         """Check if line contains program usage information"""
@@ -285,6 +295,100 @@ class OutputParser:
                 return True
         return False
 
+    def _is_energy_section_header(self, line: str) -> bool:
+        """Check if line is an energy section header"""
+        section_patterns = [
+            r"MRSF-CIS energies from GAMESS:",
+            r"CASCI energies after SA-CASSCF",
+        ]
+
+        for pattern in section_patterns:
+            if re.search(pattern, line):
+                return True
+        return False
+
+    def _get_energy_section_type(self, line: str) -> str:
+        """Determine the type of energy section"""
+        if "MRSF-CIS" in line:
+            return "mrsf_cis"
+        elif "SA-CASSCF" in line:
+            return "sa_cas"
+        else:
+            return "unknown"
+
+    def _parse_energy_section(
+        self, lines: List[str], start_idx: int, start_line_num: int, section_type: str
+    ):
+        """Parse energy section based on its type"""
+        if section_type == "mrsf_cis":
+            self._parse_mrsf_cis_section(lines, start_idx, start_line_num)
+        elif section_type == "sa_cas":
+            self._parse_sa_cas_section(lines, start_idx, start_line_num)
+
+    def _parse_mrsf_cis_section(
+        self, lines: List[str], start_idx: int, start_line_num: int
+    ):
+        """Parse MRSF-CIS energy section"""
+        # First add the header line
+        header_line = lines[start_idx].strip()
+        self.energies.append({"line": header_line, "line_number": start_line_num})
+
+        i = start_idx + 1  # Start from line after header
+        while i < len(lines):
+            line = lines[i].strip()
+            line_num = i + 1
+
+            # Look for state lines
+            state_patterns = [
+                r"Ground State\s+\d+:\s+E=\s*[-+]?\d*\.\d+\s*a\.u\.",
+                r"Excited State\s+\d+:\s+E=\s*[-+]?\d*\.\d+\s*a\.u\.",
+            ]
+
+            found_state = False
+            for pattern in state_patterns:
+                if re.search(pattern, line):
+                    self.energies.append({"line": line, "line_number": line_num})
+                    found_state = True
+                    break
+
+            if not found_state:
+                # Stop if we hit a different type of line
+                if line and not any(re.search(p, line) for p in state_patterns):
+                    break
+
+            i += 1
+
+        self._last_parsed_line = i - 1
+
+    def _parse_sa_cas_section(
+        self, lines: List[str], start_idx: int, start_line_num: int
+    ):
+        """Parse SA-CAS energy section"""
+        # First add the header line
+        header_line = lines[start_idx].strip()
+        self.energies.append({"line": header_line, "line_number": start_line_num})
+
+        i = start_idx + 1  # Start from line after header
+        while i < len(lines):
+            line = lines[i].strip()
+            line_num = i + 1
+
+            # Look for state lines
+            state_pattern = r"State\s+\d+,\s+E\s*=\s*[-+]?\d*\.\d+\s*a\.u\."
+
+            if re.search(state_pattern, line):
+                self.energies.append({"line": line, "line_number": line_num})
+            elif line and not re.search(state_pattern, line):
+                # Stop if we hit a different type of line
+                break
+
+            i += 1
+
+        self._last_parsed_line = i - 1
+
+    def _get_last_parsed_line(self) -> int:
+        """Get the last line number that was parsed in section-based parsing"""
+        return getattr(self, "_last_parsed_line", 0)
 
     def format_preview(
         self, parsed_data: Dict, blocked_warnings: Optional[List[str]] = None
@@ -303,7 +407,9 @@ class OutputParser:
         for warning in parsed_data["warnings"]:
             is_blocked = False
             for blocked_pattern in blocked_warnings:
-                if re.search(re.escape(blocked_pattern), warning["text"], re.IGNORECASE):
+                if re.search(
+                    re.escape(blocked_pattern), warning["text"], re.IGNORECASE
+                ):
                     is_blocked = True
                     break
             if not is_blocked:
@@ -316,9 +422,7 @@ class OutputParser:
                     line_info = f"Line {warning['start_line']}"
                 else:
                     line_info = f"Lines {warning['start_line']}-{warning['end_line']}"
-                sections.append(
-                    f"[yellow]{line_info}: {warning['text']}[/yellow]"
-                )
+                sections.append(f"[yellow]{line_info}: {warning['text']}[/yellow]")
             sections.append("")
 
         # Format programs
@@ -485,7 +589,9 @@ class FchPreviewParser:
         return [f"[bold magenta]Active Space:[/bold magenta] [magenta]{line}[/magenta]"]
 
     @staticmethod
-    def filter_active_noons(noon_list: list, active_space: dict) -> tuple[list, int | None]:
+    def filter_active_noons(
+        noon_list: list, active_space: dict
+    ) -> tuple[list, int | None]:
         """Filter NOONs to active space range"""
         total_count = len(noon_list)
 
@@ -591,9 +697,7 @@ class FchPreviewParser:
             except TypeError:
                 items = [composition]
 
-        ranges = FchPreviewParser.get_preview_ranges(
-            active_space, len(items), margin
-        )
+        ranges = FchPreviewParser.get_preview_ranges(active_space, len(items), margin)
         rows = []
         for region, start_index, end_index in ranges:
             if start_index >= end_index:
@@ -654,7 +758,9 @@ class FchPreviewParser:
         return lines
 
     @staticmethod
-    def get_active_range(active_space: dict, total_count: int | None) -> tuple[int | None, int | None]:
+    def get_active_range(
+        active_space: dict, total_count: int | None
+    ) -> tuple[int | None, int | None]:
         """Get active space indices based on orbital counts"""
         ndb = active_space.get("ndb")
         nacto = active_space.get("nacto")
@@ -698,7 +804,9 @@ class FchPreviewParser:
         docc_start = max(0, ndb_value - margin)
         docc_end = ndb_value
         vir_start = active_end
-        vir_end = min(total_count, active_end + margin, ndb_value + nacto_value + nvir_value)
+        vir_end = min(
+            total_count, active_end + margin, ndb_value + nacto_value + nvir_value
+        )
 
         return [
             ("docc", docc_start, docc_end),
